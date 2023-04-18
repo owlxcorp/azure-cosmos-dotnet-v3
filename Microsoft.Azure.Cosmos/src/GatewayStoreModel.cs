@@ -15,6 +15,7 @@ namespace Microsoft.Azure.Cosmos
     using System.Threading.Tasks;
     using Microsoft.Azure.Cosmos.Common;
     using Microsoft.Azure.Cosmos.Core.Trace;
+    using Microsoft.Azure.Cosmos.Resource.Settings;
     using Microsoft.Azure.Cosmos.Routing;
     using Microsoft.Azure.Cosmos.Tracing;
     using Microsoft.Azure.Documents;
@@ -93,6 +94,29 @@ namespace Microsoft.Azure.Cosmos
             return response;
         }
 
+        public virtual async Task<AccountClientConfigProperties> GetDatabaseAccountClientConfigAsync(Func<ValueTask<HttpRequestMessage>> requestMessage,
+                                                IClientSideRequestStatistics clientSideRequestStatistics,
+                                                CancellationToken cancellationToken = default)
+        {
+            AccountClientConfigProperties databaseAccountClientConfig = null;
+
+            // Get the ServiceDocumentResource from the gateway.
+            using (HttpResponseMessage responseMessage = await this.gatewayStoreClient.SendHttpAsync(
+                requestMessage,
+                ResourceType.DatabaseAccount,
+                HttpTimeoutPolicyControlPlaneRead.Instance,
+                clientSideRequestStatistics,
+                cancellationToken))
+            {
+                using (DocumentServiceResponse documentServiceResponse = await ClientExtensions.ParseResponseAsync(responseMessage))
+                {
+                    databaseAccountClientConfig = CosmosResource.FromStream<AccountClientConfigProperties>(documentServiceResponse);
+                }
+            }
+
+            return databaseAccountClientConfig;
+        }
+        
         public virtual async Task<AccountProperties> GetDatabaseAccountAsync(Func<ValueTask<HttpRequestMessage>> requestMessage,
                                                         IClientSideRequestStatistics clientSideRequestStatistics,
                                                         CancellationToken cancellationToken = default)
