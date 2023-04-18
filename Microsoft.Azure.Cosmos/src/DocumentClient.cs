@@ -189,6 +189,8 @@ namespace Microsoft.Azure.Cosmos
         private event EventHandler<ReceivedResponseEventArgs> receivedResponse;
         private Func<TransportClient, TransportClient> transportClientHandlerFactory;
 
+        private Task accountClientConfigTask;
+        
         /// <summary>
         /// Initializes a new instance of the <see cref="DocumentClient"/> class using the
         /// specified Azure Cosmos DB service endpoint, key, and connection policy for the Azure Cosmos DB service.
@@ -1362,9 +1364,16 @@ namespace Microsoft.Azure.Cosmos
                 this.initTaskCache = null;
             }
 
+            if (this.accountClientConfigTask != null)
+            {
+                this.accountClientConfigTask.Dispose();
+                this.accountClientConfigTask = null;
+            }
+            
             if (this.clientTelemetry != null)
             {
                 this.clientTelemetry.Dispose();
+                this.clientTelemetry = null;
             }
 
             DefaultTrace.TraceInformation("DocumentClient with id {0} disposed.", this.traceId);
@@ -6449,17 +6458,7 @@ namespace Microsoft.Azure.Cosmos
             return TaskHelper.InlineIfPossible(() => this.GetDatabaseAccountPrivateAsync(this.ReadEndpoint), this.ResetSessionTokenRetryPolicy.GetRequestPolicy());
         }
         
-        public virtual void InitializeAccountClientConfigsAndStartBackgroundRefresh()
-        {
-            if (this.cancellationTokenSource.IsCancellationRequested)
-            {
-                return;
-            }
-
-            _ = Task.Run(() => this.RefreshDatabaseAccountClientConfigInternalAsync(this.cancellationTokenSource.Token), this.cancellationTokenSource.Token);
-        }
-        
-        private async Task RefreshDatabaseAccountClientConfigInternalAsync(CancellationToken cancellationToken)
+        async Task IDocumentClientInternal.RefreshDatabaseAccountClientConfigInternalAsync(Uri serviceEndpoint)
         {
             if (this.GatewayStoreModel is GatewayStoreModel gatewayModel)
             {
@@ -6468,13 +6467,13 @@ namespace Microsoft.Azure.Cosmos
                     HttpRequestMessage request = new HttpRequestMessage
                     {
                         Method = HttpMethod.Get,
-                        RequestUri = this.ReadEndpoint
+                        RequestUri = serviceEndpoint
                     };
 
                     INameValueCollection headersCollection = new StoreResponseNameValueCollection();
                     await this.cosmosAuthorization.AddAuthorizationHeaderAsync(
                         headersCollection,
-                        this.ReadEndpoint,
+                        serviceEndpoint,
                         "GET",
                         AuthorizationTokenType.PrimaryMasterKey);
 
@@ -6486,16 +6485,10 @@ namespace Microsoft.Azure.Cosmos
                     return request;
                 }
 
-                // Reload Account Client Configuration
-                while (!cancellationToken.IsCancellationRequested)
-                {
-                    AccountClientConfigProperties databaseAccountClientConfigs = await gatewayModel.GetDatabaseAccountClientConfigAsync(CreateRequestMessage,
-                                                                                             clientSideRequestStatistics: null);
+                AccountClientConfigProperties databaseAccountClientConfigs = await gatewayModel.GetDatabaseAccountClientConfigAsync(CreateRequestMessage,
+                                                                                            clientSideRequestStatistics: null);
                     
-                    this.InitializeClientTelemetry(databaseAccountClientConfigs);
-                    
-                    await Task.Delay(5000, this.cancellationTokenSource.Token);
-                }
+                this.InitializeClientTelemetry(databaseAccountClientConfigs);
             }
         }
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
@@ -6808,7 +6801,7 @@ namespace Microsoft.Azure.Cosmos
 #if !INTERNAL
             // Disable system usage for internal builds. Cosmos DB owns the VMs and already logs
             // the system information so no need to track it.
-            this.InitializeAccountClientConfigsAndStartBackgroundRefresh();
+            this.accountClientConfigTask = Task.Run(() => this.GlobalEndpointManager.InitializeAccountClientConfigsAndStartBackgroundRefreshAsync());
 #endif
         }
 

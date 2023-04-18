@@ -34,8 +34,7 @@ namespace Microsoft.Azure.Cosmos.Handler
             refreshInterval: DiagnosticsHandlerHelper.ClientTelemetryRefreshInterval);
 
         private static bool isDiagnosticsMonitoringEnabled = false;
-        private static bool isTelemetryMonitoringEnabled = false;
-
+        
         /// <summary>
         /// Singleton to make sure only one instance of DiagnosticHandlerHelper is there.
         /// The system usage collection is disabled for internal builds so it is set to null to avoid
@@ -61,17 +60,11 @@ namespace Microsoft.Azure.Cosmos.Handler
             // If the CPU monitor fails for some reason don't block the application
             try
             {
-                DiagnosticsHandlerHelper.isTelemetryMonitoringEnabled = ClientTelemetryOptions.IsClientTelemetryEnabled();
-
                 List<SystemUsageRecorder> recorders = new List<SystemUsageRecorder>()
                 {
                     this.diagnosticSystemUsageRecorder,
+                    this.telemetrySystemUsageRecorder
                 };
-
-                if (DiagnosticsHandlerHelper.isTelemetryMonitoringEnabled)
-                {
-                    recorders.Add(this.telemetrySystemUsageRecorder);
-                }
 
                 this.systemUsageMonitor = SystemUsageMonitor.CreateAndStart(recorders);
 
@@ -82,7 +75,6 @@ namespace Microsoft.Azure.Cosmos.Handler
                 DefaultTrace.TraceError(ex.Message);
 
                 DiagnosticsHandlerHelper.isDiagnosticsMonitoringEnabled = false;
-                DiagnosticsHandlerHelper.isTelemetryMonitoringEnabled = false;
             }
         }
 
@@ -116,7 +108,7 @@ namespace Microsoft.Azure.Cosmos.Handler
         /// <returns> CpuAndMemoryUsageRecorder</returns>
         public SystemUsageHistory GetClientTelemetrySystemHistory()
         {
-            if (!DiagnosticsHandlerHelper.isTelemetryMonitoringEnabled)
+            if (!DiagnosticsHandlerHelper.isDiagnosticsMonitoringEnabled)
             {
                 return null;
             }
@@ -128,7 +120,7 @@ namespace Microsoft.Azure.Cosmos.Handler
             catch (Exception ex)
             {
                 DefaultTrace.TraceError(ex.Message);
-                DiagnosticsHandlerHelper.isTelemetryMonitoringEnabled = false;
+                DiagnosticsHandlerHelper.isDiagnosticsMonitoringEnabled = false;
                 return null;
             }
         }

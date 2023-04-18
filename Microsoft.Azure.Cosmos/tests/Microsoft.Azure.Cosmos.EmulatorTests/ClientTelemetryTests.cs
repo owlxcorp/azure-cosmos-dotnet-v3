@@ -24,10 +24,13 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
     using System.Linq;
     using Cosmos.Util;
     using Microsoft.Azure.Cosmos.Telemetry.Models;
+    using Microsoft.Azure.Cosmos.Resource.Settings;
 
     [TestClass]
     public class ClientTelemetryTests : BaseCosmosClientHelper
     {
+        private const string EndpointUrl = "http://dummy.test.com";
+        
         private const int scheduledInSeconds = 1;
         private static readonly object jsonObject = JsonConvert.DeserializeObject("{\"compute\":{\"azEnvironment\":\"AzurePublicCloud\",\"customData\":\"\",\"isHostCompatibilityLayerVm\":\"false\",\"licenseType\":\"\",\"location\":\"eastus\",\"name\":\"sourabh-testing\",\"offer\":\"UbuntuServer\",\"osProfile\":{\"adminUsername\":\"azureuser\",\"computerName\":\"sourabh-testing\"},\"osType\":\"Linux\",\"placementGroupId\":\"\",\"plan\":{\"name\":\"\",\"product\":\"\",\"publisher\":\"\"},\"platformFaultDomain\":\"0\",\"platformUpdateDomain\":\"0\",\"provider\":\"Microsoft.Compute\",\"publicKeys\":[{\"keyData\":\"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC5uCeOAm3ehmhI+2PbMoMl17Eo\r\nqfHKCycSaBJsv9qxlmBOuFheSJc1XknJleXUSsuTO016/d1PyWpevnqOZNRksWoa\r\nJvQ23sDTxcK+X2OP3QlCUeX4cMjPXqlL8z1UYzU4Bx3fFvf8fs67G3N72sxWBw5P\r\nZyuXyhBm0NCe/2NYMKgEDT4ma8XszO0ikbhoPKbMbgHAQk/ktWQHNcqYOPQKEWqp\r\nEK1R0rjS2nmtovfScP/ZGXcvOpJ1/NDBo4dh1K+OxOGM/4PSH/F448J5Zy4eAyEk\r\nscys+IpeIOTOlRUy/703SNIX0LEWlnYqbyL9c1ypcYLQqF76fKkDfzzFI/OWVlGw\r\nhj/S9uP8iMsR+fhGIbn6MAa7O4DWPWLuedSp7KDYyjY09gqNJsfuaAJN4LiC6bPy\r\nhknm0PVLK3ux7EUOt+cZrHCdIFWbdOtxiPNIl1tkv9kV5aE5Aj2gJm4MeB9uXYhS\r\nOuksboBc0wyUGrl9+XZJ1+NlZOf7IjVi86CieK8= generated-by-azure\r\n\",\"path\":\"/home/azureuser/.ssh/authorized_keys\"}],\"publisher\":\"Canonical\",\"resourceGroupName\":\"sourabh-telemetry-sdk\",\"resourceId\":\"/subscriptions/8fba6d4f-7c37-4d13-9063-fd58ad2b86e2/resourceGroups/sourabh-telemetry-sdk/providers/Microsoft.Compute/virtualMachines/sourabh-testing\",\"securityProfile\":{\"secureBootEnabled\":\"false\",\"virtualTpmEnabled\":\"false\"},\"sku\":\"18.04-LTS\",\"storageProfile\":{\"dataDisks\":[],\"imageReference\":{\"id\":\"\",\"offer\":\"UbuntuServer\",\"publisher\":\"Canonical\",\"sku\":\"18.04-LTS\",\"version\":\"latest\"},\"osDisk\":{\"caching\":\"ReadWrite\",\"createOption\":\"FromImage\",\"diffDiskSettings\":{\"option\":\"\"},\"diskSizeGB\":\"30\",\"encryptionSettings\":{\"enabled\":\"false\"},\"image\":{\"uri\":\"\"},\"managedDisk\":{\"id\":\"/subscriptions/8fba6d4f-7c37-4d13-9063-fd58ad2b86e2/resourceGroups/sourabh-telemetry-sdk/providers/Microsoft.Compute/disks/sourabh-testing_OsDisk_1_9a54abfc5ba149c6a106bd9e5b558c2a\",\"storageAccountType\":\"Premium_LRS\"},\"name\":\"sourabh-testing_OsDisk_1_9a54abfc5ba149c6a106bd9e5b558c2a\",\"osType\":\"Linux\",\"vhd\":{\"uri\":\"\"},\"writeAcceleratorEnabled\":\"false\"}},\"subscriptionId\":\"8fba6d4f-7c37-4d13-9063-fd58ad2b86e2\",\"tags\":\"azsecpack:nonprod;platformsettings.host_environment.service.platform_optedin_for_rootcerts:true\",\"tagsList\":[{\"name\":\"azsecpack\",\"value\":\"nonprod\"},{\"name\":\"platformsettings.host_environment.service.platform_optedin_for_rootcerts\",\"value\":\"true\"}],\"version\":\"18.04.202103250\",\"vmId\":\"d0cb93eb-214b-4c2b-bd3d-cc93e90d9efd\",\"vmScaleSetName\":\"\",\"vmSize\":\"Standard_D2s_v3\",\"zone\":\"1\"},\"network\":{\"interface\":[{\"ipv4\":{\"ipAddress\":[{\"privateIpAddress\":\"10.0.7.5\",\"publicIpAddress\":\"\"}],\"subnet\":[{\"address\":\"10.0.7.0\",\"prefix\":\"24\"}]},\"ipv6\":{\"ipAddress\":[]},\"macAddress\":\"000D3A8F8BA0\"}]}}");
 
@@ -55,15 +58,13 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
         [TestInitialize]
         public void TestInitialize()
         {
-            Util.EnableClientTelemetryEnvironmentVariables();
-            
             this.actualInfo = new List<ClientTelemetryProperties>();
 
             this.httpHandler = new HttpClientHandlerHelper
             {
                 RequestCallBack = (request, cancellation) =>
                 {
-                    if (request.RequestUri.AbsoluteUri.Equals(ClientTelemetryOptions.GetClientTelemetryEndpoint().AbsoluteUri))
+                    if (request.RequestUri.AbsoluteUri.Equals(ClientTelemetryTests.EndpointUrl))
                     {
                         HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
 
@@ -76,10 +77,28 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
 
                         return Task.FromResult(result);
                     }
-                    else if (request.RequestUri.AbsoluteUri.Equals(VmMetadataApiHandler.vmMetadataEndpointUrl.AbsoluteUri))
+                    else if (request.RequestUri.AbsoluteUri.Contains(Paths.ClientConfigPathSegment))
                     {
                         HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
 
+                        AccountClientConfigProperties clientConfigProperties = new AccountClientConfigProperties
+                        {
+                            ClientTelemetryConfiguration = new ClientTelemetryConfiguration
+                            {
+                                IsEnabled = true,
+                                Endpoint = ClientTelemetryTests.EndpointUrl
+                            }
+                        };
+
+                        string payload = JsonConvert.SerializeObject(clientConfigProperties);
+                        result.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+                        
+                        return Task.FromResult(result);
+                    }
+                    else if (request.RequestUri.AbsoluteUri.Equals(VmMetadataApiHandler.vmMetadataEndpointUrl.AbsoluteUri))
+                    {
+                        HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
+                        
                         string payload = JsonConvert.SerializeObject(ClientTelemetryTests.jsonObject);
                         result.Content = new StringContent(payload, Encoding.UTF8, "application/json");
 
@@ -93,7 +112,7 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
             {
                 RequestCallBack = (request, cancellation) =>
                 {
-                    if (request.RequestUri.AbsoluteUri.Equals(ClientTelemetryOptions.GetClientTelemetryEndpoint().AbsoluteUri))
+                    if (request.RequestUri.AbsoluteUri.Equals(ClientTelemetryTests.EndpointUrl))
                     {
                         HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
 
@@ -103,6 +122,25 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
                         {
                             this.actualInfo.Add(JsonConvert.DeserializeObject<ClientTelemetryProperties>(jsonObject));
                         }
+
+                        return Task.FromResult(result);
+                    }
+                    else if (request.RequestUri.AbsoluteUri.Contains(Paths.ClientConfigPathSegment))
+                    {
+                        HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
+
+                        AccountClientConfigProperties clientConfigProperties = new AccountClientConfigProperties
+                        {
+                            ClientTelemetryConfiguration = new ClientTelemetryConfiguration
+                            {
+                                IsEnabled = true,
+                                Endpoint = ClientTelemetryTests.EndpointUrl
+                            }
+                        };
+
+                        string payload = JsonConvert.SerializeObject(clientConfigProperties);
+                        result.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+
 
                         return Task.FromResult(result);
                     }
@@ -171,8 +209,6 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
             azMetadataField.SetValue(null, null);
 
             await base.TestCleanup();
-
-            Util.DisableClientTelemetryEnvironmentVariables();
         }
 
         [ClassCleanup]
@@ -423,8 +459,6 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
         [DataRow(ConnectionMode.Gateway)]
         public async Task QueryOperationSinglePartitionTest(ConnectionMode mode)
         {
-            Environment.SetEnvironmentVariable(ClientTelemetryOptions.EnvPropsClientTelemetrySchedulingInSeconds, "20");
-
             Container container = await this.CreateClientAndContainer(mode);
 
             ToDoActivity testItem = ToDoActivity.CreateRandomToDoActivity("MyTestPkValue", "MyTestItemId");
@@ -482,7 +516,6 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
         [DataRow(ConnectionMode.Gateway)]
         public async Task QueryMultiPageSinglePartitionOperationTest(ConnectionMode mode)
         {
-            Environment.SetEnvironmentVariable(ClientTelemetryOptions.EnvPropsClientTelemetrySchedulingInSeconds, "20");
             Container container = await this.CreateClientAndContainer(mode: mode);
 
             ItemRequestOptions requestOptions = new ItemRequestOptions()
@@ -545,8 +578,6 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
         [DataRow(ConnectionMode.Gateway)]
         public async Task QueryOperationCrossPartitionTest(ConnectionMode mode)
         {
-            Environment.SetEnvironmentVariable(ClientTelemetryOptions.EnvPropsClientTelemetrySchedulingInSeconds, "20");
-
             ContainerInternal itemsCore = (ContainerInternal)await this.CreateClientAndContainer(
                 mode: mode,
                 isLargeContainer: true);
@@ -597,8 +628,6 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
         [DataRow(ConnectionMode.Gateway)]
         public async Task QueryOperationMutiplePageCrossPartitionTest(ConnectionMode mode)
         {
-            Environment.SetEnvironmentVariable(ClientTelemetryOptions.EnvPropsClientTelemetrySchedulingInSeconds, "20");
-
             ContainerInternal itemsCore = (ContainerInternal)await this.CreateClientAndContainer(
                 mode: mode,
                 isLargeContainer: true);
@@ -697,7 +726,7 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
 
             httpHandler.RequestCallBack = (request, cancellation) =>
             {
-                if (request.RequestUri.AbsoluteUri.Equals(ClientTelemetryOptions.GetClientTelemetryEndpoint().AbsoluteUri))
+                if (request.RequestUri.AbsoluteUri.Equals(ClientTelemetryTests.EndpointUrl))
                 {
                     HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
 
@@ -707,6 +736,25 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
                     {
                         this.actualInfo.Add(JsonConvert.DeserializeObject<ClientTelemetryProperties>(jsonObject));
                     }
+
+                    return Task.FromResult(result);
+                }
+                else if (request.RequestUri.AbsoluteUri.Contains(Paths.ClientConfigPathSegment))
+                {
+                    HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
+
+                    AccountClientConfigProperties clientConfigProperties = new AccountClientConfigProperties
+                    {
+                        ClientTelemetryConfiguration = new ClientTelemetryConfiguration
+                        {
+                            IsEnabled = true,
+                            Endpoint = ClientTelemetryTests.EndpointUrl
+                        }
+                    };
+
+                    string payload = JsonConvert.SerializeObject(clientConfigProperties);
+                    result.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+
 
                     return Task.FromResult(result);
                 }

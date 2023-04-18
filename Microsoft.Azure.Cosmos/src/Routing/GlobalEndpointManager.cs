@@ -36,6 +36,7 @@ namespace Microsoft.Azure.Cosmos.Routing
         private readonly AsyncCache<string, AccountProperties> databaseAccountCache = new AsyncCache<string, AccountProperties>();
         private readonly TimeSpan MinTimeBetweenAccountRefresh = TimeSpan.FromSeconds(15);
         private readonly int backgroundRefreshLocationTimeIntervalInMS = GlobalEndpointManager.DefaultBackgroundRefreshLocationTimeIntervalInMS;
+        private readonly int backgroundRefreshAccountClientConfigTimeIntervalInMS = GlobalEndpointManager.DefaultBackgroundRefreshLocationTimeIntervalInMS;
         private readonly object backgroundAccountRefreshLock = new object();
         private readonly object isAccountRefreshInProgressLock = new object();
         private bool isAccountRefreshInProgress = false;
@@ -493,7 +494,18 @@ namespace Microsoft.Azure.Cosmos.Routing
             // Call itself to create a loop to continuously do background refresh every 5 minutes
             this.StartLocationBackgroundRefreshLoop();
         }
+        
+        public async Task InitializeAccountClientConfigsAndStartBackgroundRefreshAsync()
+        {
+            // Reload Account Client Configuration
+            while (!this.cancellationTokenSource.IsCancellationRequested)
+            {
+                await this.owner.RefreshDatabaseAccountClientConfigInternalAsync(new Uri(this.defaultEndpoint + Paths.ClientConfigPathSegment));
 
+                await Task.Delay(this.backgroundRefreshAccountClientConfigTimeIntervalInMS, this.cancellationTokenSource.Token);
+            }
+        }
+        
         private Task<AccountProperties> GetDatabaseAccountAsync(Uri serviceEndpoint)
         {
             return this.owner.GetDatabaseAccountInternalAsync(serviceEndpoint, this.cancellationTokenSource.Token);

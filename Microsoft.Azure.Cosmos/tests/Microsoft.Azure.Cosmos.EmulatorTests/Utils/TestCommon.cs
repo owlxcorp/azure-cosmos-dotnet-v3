@@ -99,11 +99,17 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
             Action<CosmosClientBuilder> customizeClientBuilder = null,
             bool useCustomSeralizer = true,
             bool validatePartitionKeyRangeCalls = false,
-            string accountEndpointOverride = null)
+            string accountEndpointOverride = null,
+            bool clientTelemetryEnabled = false)
         {
             CosmosClientBuilder cosmosClientBuilder = GetDefaultConfiguration(useCustomSeralizer, validatePartitionKeyRangeCalls, accountEndpointOverride);
             customizeClientBuilder?.Invoke(cosmosClientBuilder);
 
+            if (clientTelemetryEnabled)
+            {
+                cosmosClientBuilder.WithTelemetryEnabled();
+            }
+            
             CosmosClient client = cosmosClientBuilder.Build();
             Assert.IsNotNull(client.ClientOptions.Serializer);
             return client;
