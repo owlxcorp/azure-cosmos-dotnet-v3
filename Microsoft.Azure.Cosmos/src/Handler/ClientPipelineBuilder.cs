@@ -8,6 +8,7 @@ namespace Microsoft.Azure.Cosmos
     using System.Collections.Generic;
     using System.Diagnostics;
     using System.Linq;
+    using Microsoft.Azure.Cosmos.Core.Trace;
     using Microsoft.Azure.Cosmos.Handlers;
     using Microsoft.Azure.Cosmos.Telemetry;
 
@@ -50,8 +51,14 @@ namespace Microsoft.Azure.Cosmos
 #endif
             if (telemetry != null)
             {
+                DefaultTrace.TraceInformation("Client Telemetry task is running");
+                
                 this.telemetryHandler = new TelemetryHandler(telemetry);
                 Debug.Assert(this.telemetryHandler.InnerHandler == null, nameof(this.telemetryHandler));
+            }
+            else 
+            {
+                DefaultTrace.TraceWarning("Client Telemetry task not running");
             }
 
             this.UseRetryPolicy();

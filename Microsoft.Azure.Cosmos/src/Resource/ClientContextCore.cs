@@ -122,7 +122,7 @@ namespace Microsoft.Azure.Cosmos
                     cosmosClient,
                     clientOptions.ConsistencyLevel,
                     clientOptions.CustomHandlers,
-                    telemetry: documentClient.clientTelemetry);
+                    telemetry: documentClient.ClientTelemetryTask);
 
                 requestInvokerHandler = clientPipelineBuilder.Build();
             }

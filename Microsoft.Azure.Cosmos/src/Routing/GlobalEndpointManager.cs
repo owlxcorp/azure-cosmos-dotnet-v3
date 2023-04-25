@@ -495,14 +495,16 @@ namespace Microsoft.Azure.Cosmos.Routing
             this.StartLocationBackgroundRefreshLoop();
         }
         
-        public async Task InitializeAccountClientConfigsAndStartBackgroundRefreshAsync()
+        public async Task RefreshAccountClientConfigsAndStartClientTelemetryJobAsync()
         {
             // Reload Account Client Configuration
             while (!this.cancellationTokenSource.IsCancellationRequested)
             {
+                await Task.Delay(this.backgroundRefreshAccountClientConfigTimeIntervalInMS, this.cancellationTokenSource.Token);
+                Console.WriteLine($"Refreshing Account Client Configuration and Client Telemetry Task is Null => {this.owner.ClientTelemetryTask == null}");
                 await this.owner.RefreshDatabaseAccountClientConfigInternalAsync(new Uri(this.defaultEndpoint + Paths.ClientConfigPathSegment));
 
-                await Task.Delay(this.backgroundRefreshAccountClientConfigTimeIntervalInMS, this.cancellationTokenSource.Token);
+                await this.RefreshAccountClientConfigsAndStartClientTelemetryJobAsync();
             }
         }
         

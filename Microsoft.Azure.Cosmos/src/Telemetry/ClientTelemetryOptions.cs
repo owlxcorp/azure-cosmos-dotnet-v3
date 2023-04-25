@@ -83,9 +83,7 @@ namespace Microsoft.Azure.Cosmos.Telemetry
         // Why 5 sec? As of now, if any network request is taking more than 5 millisecond sec, we will consider it slow request this value can be revisited in future
         internal static readonly TimeSpan NetworkLatencyThreshold = TimeSpan.FromMilliseconds(5);
         internal static readonly int NetworkRequestsSampleSizeThreshold = 10;
-        
-        internal static readonly TimeSpan DefaultTimeStampInSeconds = TimeSpan.FromMinutes(10);
-        
+
         internal static readonly JsonSerializerSettings JsonSerializerSettings = new JsonSerializerSettings 
         { 
             NullValueHandling = NullValueHandling.Ignore,
@@ -101,6 +99,8 @@ namespace Microsoft.Azure.Cosmos.Telemetry
         private static string environmentName;
         private static TimeSpan scheduledTimeSpan = TimeSpan.Zero;
 
+        internal static TimeSpan DefaultTimeStampInSeconds = TimeSpan.FromMinutes(10);
+        
         internal static string GetHostInformation(Compute vmInformation)
         {
             return String.Concat(vmInformation?.OSType, "|",

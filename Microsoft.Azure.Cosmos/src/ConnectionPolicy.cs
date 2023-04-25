@@ -48,7 +48,7 @@ namespace Microsoft.Azure.Cosmos
             this.MaxConnectionLimit = defaultMaxConcurrentConnectionLimit;
             this.RetryOptions = new RetryOptions();
             this.EnableReadRequestsFallback = null;
-            this.EnableClientTelemetry = false;
+            this.EnableClientTelemetry = true; // it means client telemetry feature is NOT disabled forcefully for this client instance.
             this.ServerCertificateCustomValidationCallback = null;
         }
 

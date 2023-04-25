@@ -145,18 +145,27 @@ namespace Microsoft.Azure.Cosmos.Telemetry
         /// <returns>Async Task</returns>
         private async Task EnrichAndSendAsync()
         {
+            Console.WriteLine("inside client telemetry task");
             DefaultTrace.TraceInformation("Telemetry Job Started with Observing window : {0}", observingWindow);
 
             try
             {
                 while (!this.cancellationTokenSource.IsCancellationRequested)
                 {
-                    if (string.IsNullOrEmpty(this.clientTelemetryInfo.GlobalDatabaseAccountName))
+                    Console.WriteLine("inside client telemetry loop with endpoint " + this.endpointUrl);
+                    try
                     {
-                        AccountProperties accountProperties = await ClientTelemetryHelper.SetAccountNameAsync(this.globalEndpointManager);
-                        this.clientTelemetryInfo.GlobalDatabaseAccountName = accountProperties.Id;
+                        if (string.IsNullOrEmpty(this.clientTelemetryInfo?.GlobalDatabaseAccountName))
+                        {
+                            AccountProperties accountProperties = await ClientTelemetryHelper.SetAccountNameAsync(this.globalEndpointManager);
+                            this.clientTelemetryInfo.GlobalDatabaseAccountName = accountProperties.Id;
+                        }
                     }
-
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Exception while setting account name " + ex.Message);
+                    }
+                  
                     await Task.Delay(observingWindow, this.cancellationTokenSource.Token);
 
                     this.clientTelemetryInfo.DateTimeUtc = DateTime.UtcNow.ToString(ClientTelemetryOptions.DateFormat);
@@ -179,6 +188,7 @@ namespace Microsoft.Azure.Cosmos.Telemetry
 
                     List<RequestInfo> requestInfoSnapshot = this.networkDataRecorder.GetRequests();
 
+                    Console.WriteLine("going to start processing operation count : " + operationInfoSnapshot.Count + " cache refersh " + cacheRefreshInfoSnapshot.Count + " request info " + requestInfoSnapshot.Count);
                     try
                     {
                         CancellationTokenSource cancellationToken = new CancellationTokenSource(ClientTelemetryOptions.ClientTelemetryProcessorTimeOut);
@@ -252,6 +262,8 @@ namespace Microsoft.Azure.Cosmos.Telemetry
                             long responseSizeInBytes = 0,
                             string consistencyLevel = null )
         {
+            Console.WriteLine("start collection done cache");
+            
             if (string.IsNullOrEmpty(cacheRefreshSource))
             {
                 throw new ArgumentNullException(nameof(cacheRefreshSource));
@@ -285,6 +297,8 @@ namespace Microsoft.Azure.Cosmos.Telemetry
             {
                 DefaultTrace.TraceError("Latency Recording Failed by Telemetry. Exception : {0}", ex);
             }
+
+            Console.WriteLine("collection done cache");
         }
 
         /// <summary>
@@ -313,6 +327,7 @@ namespace Microsoft.Azure.Cosmos.Telemetry
                             SubStatusCodes subStatusCode,
                             ITrace trace)
         {
+            Console.WriteLine("start collection done ops info");
             DefaultTrace.TraceVerbose("Collecting Operation data for Telemetry.");
 
             if (cosmosDiagnostics == null)
@@ -362,6 +377,8 @@ namespace Microsoft.Azure.Cosmos.Telemetry
             {
                 DefaultTrace.TraceError("Request Charge Recording Failed by Telemetry. Request Charge Value : {0}  Exception : {1} ", requestChargeToRecord, ex);
             }
+            
+            Console.WriteLine("collection done ops info");
         }
 
         /// <summary>

@@ -9,7 +9,9 @@ namespace Microsoft.Azure.Cosmos
     using System.Net.Http;
     using System.Threading;
     using System.Threading.Tasks;
+    using Microsoft.Azure.Cosmos.Core.Trace;
     using Microsoft.Azure.Cosmos.Resource.CosmosExceptions;
+    using Microsoft.Azure.Cosmos.Resource.Settings;
     using Microsoft.Azure.Cosmos.Routing;
     using Microsoft.Azure.Cosmos.Tracing;
     using Microsoft.Azure.Cosmos.Tracing.TraceData;
@@ -81,6 +83,44 @@ namespace Microsoft.Azure.Cosmos
                                                 innerException: ex,
                                                 trace: trace);
                 }
+            }
+        }
+
+        public async Task<AccountClientConfigProperties> GetDatabaseAccountClientConfigAsync(Uri serviceEndpoint)
+        {
+            INameValueCollection headers = new RequestNameValueCollection();
+            await this.cosmosAuthorization.AddAuthorizationHeaderAsync(
+                headersCollection: headers,
+                serviceEndpoint,
+                HttpConstants.HttpMethods.Get,
+                AuthorizationTokenType.PrimaryMasterKey);
+
+            using (ITrace trace = Trace.GetRootTrace("Account Client Config Read", TraceComponent.Transport, TraceLevel.Info))
+            {
+                try
+                {
+                    using (HttpResponseMessage responseMessage = await this.httpClient.GetAsync(
+                        uri: serviceEndpoint,
+                        additionalHeaders: headers,
+                        resourceType: ResourceType.DatabaseAccount,
+                        timeoutPolicy: HttpTimeoutPolicyControlPlaneRead.Instance,
+                        clientSideRequestStatistics: null,
+                        cancellationToken: default))
+                    using (DocumentServiceResponse documentServiceResponse = await ClientExtensions.ParseResponseAsync(responseMessage))
+                    {
+                        return CosmosResource.FromStream<AccountClientConfigProperties>(documentServiceResponse);
+                    }
+                }
+                catch (ObjectDisposedException) when (this.cancellationToken.IsCancellationRequested)
+                {
+                    DefaultTrace.TraceError($"Client is being disposed for {serviceEndpoint} at {DateTime.UtcNow}, cancelling further operations.");
+                }
+                catch (Exception ex)
+                {
+                    DefaultTrace.TraceError($"Exception while calling client config " + ex.StackTrace);
+                }
+
+                return null;
             }
         }
 

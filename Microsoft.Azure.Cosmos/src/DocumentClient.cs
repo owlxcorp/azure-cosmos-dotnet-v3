@@ -143,8 +143,7 @@ namespace Microsoft.Azure.Cosmos
         private Documents.ConsistencyLevel? desiredConsistencyLevel;
 
         internal CosmosAccountServiceConfiguration accountServiceConfiguration { get; private set; }
-        internal ClientTelemetry clientTelemetry { get; set; }
-
+        
         private ClientCollectionCache collectionCache;
 
         private PartitionKeyRangeCache partitionKeyRangeCache;
@@ -663,7 +662,7 @@ namespace Microsoft.Azure.Cosmos
                     storeModel: this.GatewayStoreModel, 
                     tokenProvider: this, 
                     retryPolicy: this.retryPolicy,
-                    clientTelemetry: this.clientTelemetry);
+                    clientTelemetry: this.ClientTelemetryTask);
                 this.partitionKeyRangeCache = new PartitionKeyRangeCache(this, this.GatewayStoreModel, this.collectionCache);
 
                 DefaultTrace.TraceWarning("{0} occurred while OpenAsync. Exception Message: {1}", ex.ToString(), ex.Message);
@@ -1025,7 +1024,7 @@ namespace Microsoft.Azure.Cosmos
                     storeModel: this.GatewayStoreModel, 
                     tokenProvider: this, 
                     retryPolicy: this.retryPolicy,
-                    clientTelemetry: this.clientTelemetry);
+                    clientTelemetry: this.ClientTelemetryTask);
             this.partitionKeyRangeCache = new PartitionKeyRangeCache(this, this.GatewayStoreModel, this.collectionCache);
             this.ResetSessionTokenRetryPolicy = new ResetSessionTokenRetryPolicyFactory(this.sessionContainer, this.collectionCache, this.retryPolicy);
 
@@ -1050,11 +1049,11 @@ namespace Microsoft.Azure.Cosmos
         {
             if (databaseAccountClientConfigs.IsClientTelemetryEnabled() && this.ConnectionPolicy.EnableClientTelemetry)
             {
-                if (this.clientTelemetry == null)
+                if (this.ClientTelemetryTask == null)
                 {
                     try
                     {
-                        this.clientTelemetry = ClientTelemetry.CreateAndStartBackgroundTelemetry(
+                        this.ClientTelemetryTask = ClientTelemetry.CreateAndStartBackgroundTelemetry(
                             clientId: this.clientId,
                             httpClient: this.httpClient,
                             userAgent: this.ConnectionPolicy.UserAgentContainer.BaseUserAgent,
@@ -1080,12 +1079,12 @@ namespace Microsoft.Azure.Cosmos
             }
             else
             {
-                if (this.clientTelemetry != null)
+                if (this.ClientTelemetryTask != null)
                 {
                     DefaultTrace.TraceInformation("Stopping Client Telemetry Job.");
                     
-                    this.clientTelemetry.Dispose();
-                    this.clientTelemetry = null;
+                    this.ClientTelemetryTask.Dispose();
+                    this.ClientTelemetryTask = null;
                 }
                 else
                 {
@@ -1370,10 +1369,10 @@ namespace Microsoft.Azure.Cosmos
                 this.accountClientConfigTask = null;
             }
             
-            if (this.clientTelemetry != null)
+            if (this.ClientTelemetryTask != null)
             {
-                this.clientTelemetry.Dispose();
-                this.clientTelemetry = null;
+                this.ClientTelemetryTask.Dispose();
+                this.ClientTelemetryTask = null;
             }
 
             DefaultTrace.TraceInformation("DocumentClient with id {0} disposed.", this.traceId);
@@ -1422,6 +1421,8 @@ namespace Microsoft.Azure.Cosmos
         internal Action<IQueryable> OnExecuteScalarQueryCallback { get; set; }
 
         internal virtual Task<QueryPartitionProvider> QueryPartitionProvider => this.queryPartitionProvider.Value;
+
+        public ClientTelemetry ClientTelemetryTask { get; set; }
 
         internal virtual async Task<ConsistencyLevel> GetDefaultConsistencyLevelAsync()
         {
@@ -1598,15 +1599,19 @@ namespace Microsoft.Azure.Cosmos
                         key: DocumentClient.DefaultInitTaskKey,
                         singleValueInitFunc: this.initializeTaskFactory,
                         forceRefresh: (_) => false);
+
+                    Console.WriteLine("Client is intialized? " + this.isSuccessfullyInitialized);
                 }
                 catch (DocumentClientException ex)
                 {
+                    Console.WriteLine("Throw while checking if Client is intialized? " + ex.StackTrace);
                     throw Resource.CosmosExceptions.CosmosExceptionFactory.Create(
                          dce: ex,
                          trace: trace);
                 }
                 catch (Exception e)
                 {
+                    Console.WriteLine("Throw while checking if Client is intialized? " + e.StackTrace);
                     DefaultTrace.TraceWarning("EnsureValidClientAsync initializeTask failed {0}", e);
                     childTrace.AddDatum("initializeTask failed", e);
                     throw;
@@ -6795,13 +6800,16 @@ namespace Microsoft.Azure.Cosmos
             await this.accountServiceConfiguration.InitializeAsync();
             AccountProperties accountProperties = this.accountServiceConfiguration.AccountProperties;
             this.UseMultipleWriteLocations = this.ConnectionPolicy.UseMultipleWriteLocations && accountProperties.EnableMultipleWriteLocations;
-
-            this.GlobalEndpointManager.InitializeAccountPropertiesAndStartBackgroundRefresh(accountProperties);
             
-#if !INTERNAL
+            this.GlobalEndpointManager.InitializeAccountPropertiesAndStartBackgroundRefresh(accountProperties);
+
             // Disable system usage for internal builds. Cosmos DB owns the VMs and already logs
             // the system information so no need to track it.
-            this.accountClientConfigTask = Task.Run(() => this.GlobalEndpointManager.InitializeAccountClientConfigsAndStartBackgroundRefreshAsync());
+#if !INTERNAL
+            AccountClientConfigProperties accountClientConfigProperties = await accountReader.GetDatabaseAccountClientConfigAsync(new Uri(this.ServiceEndpoint + Paths.ClientConfigPathSegment));
+            this.InitializeClientTelemetry(accountClientConfigProperties);
+           
+            this.GlobalEndpointManager.RefreshAccountClientConfigsAndStartClientTelemetryJobAsync();
 #endif
         }
 
