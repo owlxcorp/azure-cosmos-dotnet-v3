@@ -40,7 +40,6 @@ namespace Microsoft.Azure.Cosmos.Telemetry
             IReadOnlyList<RequestInfo> requestInfoSnapshot,
             CancellationToken cancellationToken)
         {
-            Console.WriteLine($"Processing and sending telemetry payload to Client Telemetry Service i.e {endpointUrl}");
             try
             {
                 await ClientTelemetryPayloadWriter.SerializedPayloadChunksAsync(

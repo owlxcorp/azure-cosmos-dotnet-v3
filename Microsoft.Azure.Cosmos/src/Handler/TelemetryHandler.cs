@@ -15,7 +15,6 @@ namespace Microsoft.Azure.Cosmos.Handlers
     internal class TelemetryHandler : RequestHandler
     {
         private readonly CosmosClient Client;
-        private ClientTelemetry ClientTelemetryCachedTask;
 
         public TelemetryHandler(CosmosClient client)
         {
@@ -27,18 +26,15 @@ namespace Microsoft.Azure.Cosmos.Handlers
             CancellationToken cancellationToken)
         {
             await this.Client.DocumentClient.EnsureValidClientAsync(NoOpTrace.Singleton);
-                
-            if (this.ClientTelemetryCachedTask == null && this.Client.DocumentClient.ClientTelemetryTask != null)
-            {
-                this.ClientTelemetryCachedTask = this.Client.DocumentClient.ClientTelemetryTask;
-            }
 
             ResponseMessage response = await base.SendAsync(request, cancellationToken);
+
+            // Check if this particular operation is eligible for client telemetry collection
             if (this.IsAllowed(request))
             {
                 try
                 {
-                    this.ClientTelemetryCachedTask
+                    this.Client.DocumentClient.ClientTelemetryTask?
                         .CollectOperationInfo(
                                 cosmosDiagnostics: response.Diagnostics,
                                 statusCode: response.StatusCode,
@@ -57,6 +53,7 @@ namespace Microsoft.Azure.Cosmos.Handlers
                     DefaultTrace.TraceError("Error while collecting telemetry information : {0}", ex);
                 }
             }
+
             return response;
         }
 

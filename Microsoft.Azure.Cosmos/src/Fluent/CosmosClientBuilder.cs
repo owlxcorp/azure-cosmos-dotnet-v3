@@ -691,17 +691,6 @@ namespace Microsoft.Azure.Cosmos.Fluent
         }
 
         /// <summary>
-        /// To enable Telemetry, set COSMOS.CLIENT_TELEMETRY_ENABLED environment property. 
-        /// This function is used by Test only.
-        /// </summary>
-        /// <returns>The <see cref="CosmosClientBuilder"/> object</returns>
-        internal CosmosClientBuilder WithTelemetryEnabled()
-        {
-            this.clientOptions.EnableClientTelemetry = true;
-            return this;
-        }
-
-        /// <summary>
         /// Enabled partition level failover in the SDK
         /// </summary>
         internal CosmosClientBuilder WithPartitionLevelFailoverEnabled()

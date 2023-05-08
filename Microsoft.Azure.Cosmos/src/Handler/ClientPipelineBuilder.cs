@@ -8,9 +8,7 @@ namespace Microsoft.Azure.Cosmos
     using System.Collections.Generic;
     using System.Diagnostics;
     using System.Linq;
-    using Microsoft.Azure.Cosmos.Core.Trace;
     using Microsoft.Azure.Cosmos.Handlers;
-    using Microsoft.Azure.Cosmos.Telemetry;
 
     internal class ClientPipelineBuilder
     {
@@ -50,6 +48,7 @@ namespace Microsoft.Azure.Cosmos
             Debug.Assert(this.telemetryHandler.InnerHandler == null, nameof(this.telemetryHandler));
 #else
             this.diagnosticsHandler = null;
+            this.telemetryHandler = null;
 #endif
             this.UseRetryPolicy();
             this.AddCustomHandlers(customHandlers);

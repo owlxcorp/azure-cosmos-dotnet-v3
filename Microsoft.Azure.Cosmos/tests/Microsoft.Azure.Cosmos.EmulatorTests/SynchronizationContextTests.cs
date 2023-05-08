@@ -51,13 +51,13 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
                             else if (request.RequestUri.AbsoluteUri.Contains(Paths.ClientConfigPathSegment))
                             {
                                 HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
-
+                                
                                 AccountClientConfigProperties clientConfigProperties = new AccountClientConfigProperties
                                 {
                                     ClientTelemetryConfiguration = new ClientTelemetryConfiguration
                                     {
-                                        IsEnabled = true,
-                                        Endpoint = "http://dummy.test.com"
+                                        IsEnabled = withClientTelemetry,
+                                        Endpoint = withClientTelemetry? "http://dummy.test.com" : null
                                     }
                                 };
 
@@ -77,8 +77,7 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
                     };
                     
                     using (CosmosClient client = TestCommon.CreateCosmosClient(
-                        customizeClientBuilder: builder => builder.WithHttpClientFactory(() => new HttpClient(httpHandler)),
-                        clientTelemetryEnabled: withClientTelemetry))
+                        customizeClientBuilder: builder => builder.WithHttpClientFactory(() => new HttpClient(httpHandler))))
                     {
                         Cosmos.Database database = client.CreateDatabaseAsync(databaseId).GetAwaiter().GetResult();
                         database = client.CreateDatabaseIfNotExistsAsync(databaseId).GetAwaiter().GetResult();

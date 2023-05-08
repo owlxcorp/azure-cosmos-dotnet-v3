@@ -1599,19 +1599,15 @@ namespace Microsoft.Azure.Cosmos
                         key: DocumentClient.DefaultInitTaskKey,
                         singleValueInitFunc: this.initializeTaskFactory,
                         forceRefresh: (_) => false);
-
-                    Console.WriteLine("Client is intialized? " + this.isSuccessfullyInitialized);
                 }
                 catch (DocumentClientException ex)
                 {
-                    Console.WriteLine("Throw while checking if Client is intialized? " + ex.StackTrace);
                     throw Resource.CosmosExceptions.CosmosExceptionFactory.Create(
                          dce: ex,
                          trace: trace);
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("Throw while checking if Client is intialized? " + e.StackTrace);
                     DefaultTrace.TraceWarning("EnsureValidClientAsync initializeTask failed {0}", e);
                     childTrace.AddDatum("initializeTask failed", e);
                     throw;
@@ -6807,8 +6803,12 @@ namespace Microsoft.Azure.Cosmos
             // the system information so no need to track it.
 #if !INTERNAL
             AccountClientConfigProperties accountClientConfigProperties = await accountReader.GetDatabaseAccountClientConfigAsync(new Uri(this.ServiceEndpoint + Paths.ClientConfigPathSegment));
-            this.InitializeClientTelemetry(accountClientConfigProperties);
-            this.GlobalEndpointManager.InitializeClientTelemetryTaskAndStartBackgroundRefresh();
+            // Safety check to make sure, client initialization won't fail if this API is not available
+            if (accountClientConfigProperties != null)
+            {
+                this.InitializeClientTelemetry(accountClientConfigProperties);
+                this.GlobalEndpointManager.InitializeClientTelemetryTaskAndStartBackgroundRefresh();
+            }
 #endif
         }
 

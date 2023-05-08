@@ -1,26 +1,53 @@
 ﻿//------------------------------------------------------------
 // Copyright (c) Microsoft Corporation.  All rights reserved.
 //------------------------------------------------------------
+
 namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
 {
     using System;
-    using System.Collections.Generic;
     using System.Globalization;
     using System.Net;
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
-    using System.Web;
     using Documents.Client;
     using global::Azure;
     using global::Azure.Core;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
-    using Microsoft.IdentityModel.Tokens;
     using static Microsoft.Azure.Cosmos.SDK.EmulatorTests.TransportClientHelper;
+    using Microsoft.Azure.Cosmos.Resource.Settings;
+    using Newtonsoft.Json;
+    using System.Net.Http;
 
     [TestClass]
     public class CosmosAadTests
     {
+        private HttpClientHandlerHelper httpHandler;
+
+        private int successfullClientConfigApiCallCount = 0;
+        
+        [TestInitialize]
+        public void TestInitialize()
+        {
+            this.successfullClientConfigApiCallCount = 0;
+            
+            this.httpHandler = new HttpClientHandlerHelper
+            {
+                ResponseIntercepter = async (response) =>
+                {
+                    bool isClientConfigApi = response.RequestMessage.RequestUri.AbsoluteUri.Contains(Documents.Paths.ClientConfigPathSegment);
+                    if (isClientConfigApi && response.IsSuccessStatusCode)
+                    {
+                        string responseString = await response.Content.ReadAsStringAsync();
+                        Assert.IsTrue(responseString.Contains("IsEnabled"));
+                        
+                        this.successfullClientConfigApiCallCount++;
+                    }
+                    return response;
+                }
+            };
+        }
+
         [TestMethod]
         [DataRow(ConnectionMode.Direct)]
         [DataRow(ConnectionMode.Gateway)]
@@ -29,11 +56,12 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
             int requestCount = 0;
             string databaseId = Guid.NewGuid().ToString();
             string containerId = Guid.NewGuid().ToString();
-            using CosmosClient cosmosClient = TestCommon.CreateCosmosClient();
+            using CosmosClient cosmosClient = TestCommon.CreateCosmosClient(
+                (builder) => builder.WithHttpClientFactory(() => new HttpClient(this.httpHandler)));
             Database database = await cosmosClient.CreateDatabaseAsync(databaseId);
-        Container container = await database.CreateContainerAsync(
-            containerId,
-            "/id");
+            Container container = await database.CreateContainerAsync(
+                containerId,
+                "/id");
 
             try
             {
@@ -120,6 +148,8 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
                 await aadContainer.DeleteItemAsync<ToDoActivity>(
                     toDoActivity.id,
                     new PartitionKey(toDoActivity.id));
+
+                Assert.IsTrue(this.successfullClientConfigApiCallCount > 0);
             }
             finally
             {

@@ -13,6 +13,7 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
     using System.Linq;
     using System.Linq.Expressions;
     using System.Net;
+    using System.Net.Http;
     using System.Runtime.CompilerServices;
     using System.Text;
     using System.Threading.Tasks;
@@ -3376,6 +3377,31 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
             await database.DeleteAsync();
         }
 
+        [TestMethod]
+        public void ValidateClientConfigApiWithComputeGateway()
+        {
+            int successfullClientConfigApiCallCount = 0;
+            HttpClientHandlerHelper httpHandler = new HttpClientHandlerHelper
+            {
+                ResponseIntercepter = async (response) =>
+                {
+                    bool isClientConfigApi = response.RequestMessage.RequestUri.AbsoluteUri.Contains(Documents.Paths.ClientConfigPathSegment);
+                    if (isClientConfigApi && response.IsSuccessStatusCode)
+                    {
+                        string responseString = await response.Content.ReadAsStringAsync();
+                        Assert.IsTrue(responseString.Contains("IsEnabled"));
+
+                        successfullClientConfigApiCallCount++;
+                    }
+                    return response;
+                }
+            };
+            using CosmosClient client = TestCommon.CreateCosmosClient(
+                (builder) => builder.WithHttpClientFactory(() => new HttpClient(httpHandler)));
+
+            Assert.IsTrue(successfullClientConfigApiCallCount > 0, "call to compute gateway failed");
+        }
+        
         public static string DumpFullExceptionMessage(Exception e)
         {
             StringBuilder exceptionMessage = new StringBuilder();
