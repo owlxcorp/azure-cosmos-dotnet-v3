@@ -39,7 +39,7 @@ namespace Microsoft.Azure.Cosmos.Tests
             customizeClientBuilder?.Invoke(cosmosClientBuilder);
             if(enableTelemetry)
             {
-                documentClient.clientTelemetry = new Mock<ClientTelemetry>().Object;
+                documentClient.ClientTelemetryTask = new Mock<ClientTelemetry>().Object;
 
                 cosmosClientBuilder.WithTelemetryEnabled();
             }

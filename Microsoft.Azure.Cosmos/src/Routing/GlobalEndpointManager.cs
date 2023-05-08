@@ -15,6 +15,7 @@ namespace Microsoft.Azure.Cosmos.Routing
     using System.Threading.Tasks;
     using Microsoft.Azure.Cosmos.Common;
     using Microsoft.Azure.Cosmos.Core.Trace;
+    using Microsoft.Azure.Cosmos.Resource.Settings;
     using Microsoft.Azure.Documents;
 
     /// <summary>
@@ -25,7 +26,8 @@ namespace Microsoft.Azure.Cosmos.Routing
     internal class GlobalEndpointManager : IGlobalEndpointManager
     {
         private const int DefaultBackgroundRefreshLocationTimeIntervalInMS = 5 * 60 * 1000;
-
+        private const int DefaultBackgroundRefreshClientConfigTimeIntervalInMS = 10 * 60 * 1000;
+        
         private const string BackgroundRefreshLocationTimeIntervalInMS = "BackgroundRefreshLocationTimeIntervalInMS";
         private const string MinimumIntervalForNonForceRefreshLocationInMS = "MinimumIntervalForNonForceRefreshLocationInMS";
         private readonly CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
@@ -36,7 +38,7 @@ namespace Microsoft.Azure.Cosmos.Routing
         private readonly AsyncCache<string, AccountProperties> databaseAccountCache = new AsyncCache<string, AccountProperties>();
         private readonly TimeSpan MinTimeBetweenAccountRefresh = TimeSpan.FromSeconds(15);
         private readonly int backgroundRefreshLocationTimeIntervalInMS = GlobalEndpointManager.DefaultBackgroundRefreshLocationTimeIntervalInMS;
-        private readonly int backgroundRefreshAccountClientConfigTimeIntervalInMS = GlobalEndpointManager.DefaultBackgroundRefreshLocationTimeIntervalInMS;
+        private readonly int backgroundRefreshAccountClientConfigTimeIntervalInMS = GlobalEndpointManager.DefaultBackgroundRefreshClientConfigTimeIntervalInMS;
         private readonly object backgroundAccountRefreshLock = new object();
         private readonly object isAccountRefreshInProgressLock = new object();
         private bool isAccountRefreshInProgress = false;
@@ -494,18 +496,58 @@ namespace Microsoft.Azure.Cosmos.Routing
             // Call itself to create a loop to continuously do background refresh every 5 minutes
             this.StartLocationBackgroundRefreshLoop();
         }
+
+        public virtual void InitializeClientTelemetryTaskAndStartBackgroundRefresh()
+        {
+            if (this.cancellationTokenSource.IsCancellationRequested)
+            {
+                return;
+            }
+
+            try
+            {
+                this.RefreshAccountClientConfigsAndStartClientTelemetryJob();
+            }
+            catch
+            {
+                this.isBackgroundAccountRefreshActive = false;
+                throw;
+            }
+        }
         
-        public async Task RefreshAccountClientConfigsAndStartClientTelemetryJobAsync()
+#pragma warning disable VSTHRD100 // Avoid async void methods
+        public async void RefreshAccountClientConfigsAndStartClientTelemetryJob()
+#pragma warning restore VSTHRD100 // Avoid async void methods
         {
             // Reload Account Client Configuration
-            while (!this.cancellationTokenSource.IsCancellationRequested)
+            if (this.cancellationTokenSource.IsCancellationRequested)
+            {
+                return;
+            }
+            try
             {
                 await Task.Delay(this.backgroundRefreshAccountClientConfigTimeIntervalInMS, this.cancellationTokenSource.Token);
+
+                if (this.cancellationTokenSource.IsCancellationRequested)
+                {
+                    return;
+                }
+
                 Console.WriteLine($"Refreshing Account Client Configuration and Client Telemetry Task is Null => {this.owner.ClientTelemetryTask == null}");
                 await this.owner.RefreshDatabaseAccountClientConfigInternalAsync(new Uri(this.defaultEndpoint + Paths.ClientConfigPathSegment));
-
-                await this.RefreshAccountClientConfigsAndStartClientTelemetryJobAsync();
             }
+            catch (Exception ex)
+            {
+                if (this.cancellationTokenSource.IsCancellationRequested && (ex is OperationCanceledException || ex is ObjectDisposedException))
+                {
+                    return;
+                }
+
+                DefaultTrace.TraceCritical("GlobalEndpointManager: RefreshAccountClientConfigsAndStartClientTelemetryJob() - Unable to refresh database account client config. Exception: {0}", ex.ToString());
+            }
+
+            // Call itself to create a loop to continuously do background refresh every 10 minutes
+            this.RefreshAccountClientConfigsAndStartClientTelemetryJob();
         }
         
         private Task<AccountProperties> GetDatabaseAccountAsync(Uri serviceEndpoint)

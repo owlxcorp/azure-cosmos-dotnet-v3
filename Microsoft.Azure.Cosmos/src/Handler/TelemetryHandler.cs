@@ -10,26 +10,35 @@ namespace Microsoft.Azure.Cosmos.Handlers
     using System.Threading.Tasks;
     using Microsoft.Azure.Cosmos.Core.Trace;
     using Microsoft.Azure.Cosmos.Telemetry;
+    using Microsoft.Azure.Cosmos.Tracing;
 
     internal class TelemetryHandler : RequestHandler
     {
-        private readonly ClientTelemetry telemetry;
+        private readonly CosmosClient Client;
+        private ClientTelemetry ClientTelemetryCachedTask;
 
-        public TelemetryHandler(ClientTelemetry telemetry)
+        public TelemetryHandler(CosmosClient client)
         {
-            this.telemetry = telemetry ?? throw new ArgumentNullException(nameof(telemetry));
+            this.Client = client ?? throw new ArgumentNullException(nameof(client));
         }
 
         public override async Task<ResponseMessage> SendAsync(
             RequestMessage request,
             CancellationToken cancellationToken)
         {
+            await this.Client.DocumentClient.EnsureValidClientAsync(NoOpTrace.Singleton);
+                
+            if (this.ClientTelemetryCachedTask == null && this.Client.DocumentClient.ClientTelemetryTask != null)
+            {
+                this.ClientTelemetryCachedTask = this.Client.DocumentClient.ClientTelemetryTask;
+            }
+
             ResponseMessage response = await base.SendAsync(request, cancellationToken);
             if (this.IsAllowed(request))
             {
                 try
                 {
-                    this.telemetry
+                    this.ClientTelemetryCachedTask
                         .CollectOperationInfo(
                                 cosmosDiagnostics: response.Diagnostics,
                                 statusCode: response.StatusCode,

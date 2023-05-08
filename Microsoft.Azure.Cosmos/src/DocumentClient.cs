@@ -6808,8 +6808,7 @@ namespace Microsoft.Azure.Cosmos
 #if !INTERNAL
             AccountClientConfigProperties accountClientConfigProperties = await accountReader.GetDatabaseAccountClientConfigAsync(new Uri(this.ServiceEndpoint + Paths.ClientConfigPathSegment));
             this.InitializeClientTelemetry(accountClientConfigProperties);
-           
-            this.GlobalEndpointManager.RefreshAccountClientConfigsAndStartClientTelemetryJobAsync();
+            this.GlobalEndpointManager.InitializeClientTelemetryTaskAndStartBackgroundRefresh();
 #endif
         }
 
