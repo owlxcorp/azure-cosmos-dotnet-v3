@@ -149,7 +149,7 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
                     toDoActivity.id,
                     new PartitionKey(toDoActivity.id));
 
-                Assert.IsTrue(this.successfullClientConfigApiCallCount > 0);
+                Assert.IsTrue(this.successfullClientConfigApiCallCount > 0, "Client Config API call failed ");
             }
             finally
             {
