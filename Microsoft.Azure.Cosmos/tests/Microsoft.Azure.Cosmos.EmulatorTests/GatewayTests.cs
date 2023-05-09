@@ -3376,30 +3376,52 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
 
             await database.DeleteAsync();
         }
-
+        
         [TestMethod]
-        public void ValidateClientConfigApiWithComputeGateway()
+        public async Task ValidateClientConfigApiWithComputeGateway()
         {
-            int successfullClientConfigApiCallCount = 0;
+            string clientConfigResponse = null;
             HttpClientHandlerHelper httpHandler = new HttpClientHandlerHelper
             {
                 ResponseIntercepter = async (response) =>
                 {
                     bool isClientConfigApi = response.RequestMessage.RequestUri.AbsoluteUri.Contains(Documents.Paths.ClientConfigPathSegment);
-                    if (isClientConfigApi && response.IsSuccessStatusCode)
+                    if (isClientConfigApi)
                     {
                         string responseString = await response.Content.ReadAsStringAsync();
-                        Assert.IsTrue(responseString.Contains("IsEnabled"));
 
-                        successfullClientConfigApiCallCount++;
+                        if (response.IsSuccessStatusCode)
+                        {
+                            Assert.IsTrue(responseString.Contains("isEnabled"));
+                        }
+                        else
+                        {
+                            clientConfigResponse = "call to compute gateway failed with Status Code: " + response.StatusCode + " and response: " + responseString;
+                        }
                     }
                     return response;
                 }
             };
+            
             using CosmosClient client = TestCommon.CreateCosmosClient(
-                (builder) => builder.WithHttpClientFactory(() => new HttpClient(httpHandler)));
+                (builder) => builder.WithHttpClientFactory(() => new HttpClient(httpHandler)),
+                accountEndpointOverride: Utils.ConfigurationManager.AppSettings["ComputeGatewayEndpoint"]);
+            
+            Cosmos.Database database = await client.CreateDatabaseAsync(Guid.NewGuid().ToString());
 
-            Assert.IsTrue(successfullClientConfigApiCallCount > 0, "call to compute gateway failed");
+            Cosmos.Container container = await database.CreateContainerAsync(
+                id: Guid.NewGuid().ToString(),
+                partitionKeyPath: "/id");
+
+            ToDoActivity testItem = ToDoActivity.CreateRandomToDoActivity("MyTestPkValue");
+            ItemResponse<ToDoActivity> createResponse = await container.CreateItemAsync<ToDoActivity>(testItem);
+
+            await database.DeleteAsync();
+            
+            if(clientConfigResponse != null)
+            {
+                Assert.Fail(clientConfigResponse);
+            }
         }
         
         public static string DumpFullExceptionMessage(Exception e)

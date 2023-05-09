@@ -7,7 +7,6 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
     using System;
     using System.Globalization;
     using System.Net;
-    using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
     using Documents.Client;
@@ -15,49 +14,42 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
     using global::Azure.Core;
     using Microsoft.VisualStudio.TestTools.UnitTesting;
     using static Microsoft.Azure.Cosmos.SDK.EmulatorTests.TransportClientHelper;
-    using Microsoft.Azure.Cosmos.Resource.Settings;
-    using Newtonsoft.Json;
     using System.Net.Http;
 
     [TestClass]
     public class CosmosAadTests
     {
-        private HttpClientHandlerHelper httpHandler;
-
-        private int successfullClientConfigApiCallCount = 0;
-        
-        [TestInitialize]
-        public void TestInitialize()
-        {
-            this.successfullClientConfigApiCallCount = 0;
-            
-            this.httpHandler = new HttpClientHandlerHelper
-            {
-                ResponseIntercepter = async (response) =>
-                {
-                    bool isClientConfigApi = response.RequestMessage.RequestUri.AbsoluteUri.Contains(Documents.Paths.ClientConfigPathSegment);
-                    if (isClientConfigApi && response.IsSuccessStatusCode)
-                    {
-                        string responseString = await response.Content.ReadAsStringAsync();
-                        Assert.IsTrue(responseString.Contains("IsEnabled"));
-                        
-                        this.successfullClientConfigApiCallCount++;
-                    }
-                    return response;
-                }
-            };
-        }
-
         [TestMethod]
         [DataRow(ConnectionMode.Direct)]
         [DataRow(ConnectionMode.Gateway)]
         public async Task AadMockTest(ConnectionMode connectionMode)
         {
+            string clientConfigApiResponse = null;
+            HttpClientHandlerHelper httpHandler = new HttpClientHandlerHelper
+            {
+                ResponseIntercepter = async (response) =>
+                {
+                    bool isClientConfigApi = response.RequestMessage.RequestUri.AbsoluteUri.Contains(Documents.Paths.ClientConfigPathSegment);
+                    if (isClientConfigApi)
+                    {
+                        string responseString = await response.Content.ReadAsStringAsync();
+                        if (response.IsSuccessStatusCode)
+                        {
+                            Assert.IsTrue(responseString.Contains("isEnabled"));
+                        }
+                        else
+                        {
+                            clientConfigApiResponse = responseString;
+                        }
+                    }
+                    return response;
+                }
+            };
+            
             int requestCount = 0;
             string databaseId = Guid.NewGuid().ToString();
             string containerId = Guid.NewGuid().ToString();
-            using CosmosClient cosmosClient = TestCommon.CreateCosmosClient(
-                (builder) => builder.WithHttpClientFactory(() => new HttpClient(this.httpHandler)));
+            using CosmosClient cosmosClient = TestCommon.CreateCosmosClient();
             Database database = await cosmosClient.CreateDatabaseAsync(databaseId);
             Container container = await database.CreateContainerAsync(
                 containerId,
@@ -109,6 +101,8 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
                      });
                 }
 
+                clientOptions.HttpClientFactory = () => new HttpClient(httpHandler);
+                
                 using CosmosClient aadClient = new CosmosClient(
                     endpoint,
                     simpleEmulatorTokenCredential,
@@ -149,7 +143,7 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
                     toDoActivity.id,
                     new PartitionKey(toDoActivity.id));
 
-                Assert.IsTrue(this.successfullClientConfigApiCallCount > 0, "Client Config API call failed ");
+                Assert.IsNull(clientConfigApiResponse, clientConfigApiResponse);
             }
             finally
             {

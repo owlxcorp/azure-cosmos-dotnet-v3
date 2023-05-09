@@ -113,11 +113,11 @@ namespace Microsoft.Azure.Cosmos
                 }
                 catch (ObjectDisposedException) when (this.cancellationToken.IsCancellationRequested)
                 {
-                    DefaultTrace.TraceError($"Client is being disposed for {serviceEndpoint} at {DateTime.UtcNow}, cancelling further operations.");
+                    DefaultTrace.TraceWarning($"Client is being disposed for {serviceEndpoint} at {DateTime.UtcNow}, cancelling further operations.");
                 }
                 catch (Exception ex)
                 {
-                    DefaultTrace.TraceError($"Exception while calling client config " + ex.StackTrace);
+                    DefaultTrace.TraceWarning($"Exception while calling client config " + ex.StackTrace);
                 }
 
                 return null;

@@ -26,7 +26,7 @@ namespace Microsoft.Azure.Cosmos.Routing
     internal class GlobalEndpointManager : IGlobalEndpointManager
     {
         private const int DefaultBackgroundRefreshLocationTimeIntervalInMS = 5 * 60 * 1000;
-        private const int DefaultBackgroundRefreshClientConfigTimeIntervalInMS = 10 * 60 * 1000;
+        private const int DefaultBackgroundRefreshClientConfigTimeIntervalInMS = 10;
         
         private const string BackgroundRefreshLocationTimeIntervalInMS = "BackgroundRefreshLocationTimeIntervalInMS";
         private const string MinimumIntervalForNonForceRefreshLocationInMS = "MinimumIntervalForNonForceRefreshLocationInMS";
@@ -532,8 +532,6 @@ namespace Microsoft.Azure.Cosmos.Routing
                 {
                     return;
                 }
-
-                Console.WriteLine($"Refreshing Account Client Configuration and Client Telemetry Task is Null => {this.owner.ClientTelemetryTask == null}");
                 await this.owner.RefreshDatabaseAccountClientConfigInternalAsync(new Uri(this.defaultEndpoint + Paths.ClientConfigPathSegment));
             }
             catch (Exception ex)
