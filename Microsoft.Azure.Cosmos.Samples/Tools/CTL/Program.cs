@@ -28,9 +28,6 @@ namespace CosmosCTL
             try
             {
                 CTLConfig config = CTLConfig.From(args);
-
-                SetEnvironmentVariables(config);
-              
                 if (config.OutputEventTraces)
                 {
                     EnableTraceSourcesToConsole();
@@ -146,12 +143,6 @@ namespace CosmosCTL
             {
                 Utils.LogError(logger, "Unhandled exception during execution", ex);
             }
-        }
-
-        private static void SetEnvironmentVariables(CTLConfig config)
-        {
-            Environment.SetEnvironmentVariable(ClientTelemetryOptions.EnvPropsClientTelemetryEndpoint, config.TelemetryEndpoint);
-            Environment.SetEnvironmentVariable(ClientTelemetryOptions.EnvPropsClientTelemetrySchedulingInSeconds, config.TelemetryScheduleInSeconds);
         }
 
         private static IMetricsRoot ConfigureReporting(

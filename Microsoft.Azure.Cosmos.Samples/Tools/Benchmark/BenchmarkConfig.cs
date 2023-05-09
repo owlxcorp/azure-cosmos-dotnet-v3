@@ -98,8 +98,8 @@ namespace CosmosBenchmark
         [Option(Required = false, HelpText = "Disable core SDK logging")]
         public bool DisableCoreSdkLogging { get; set; }
 
-        [Option(Required = false, HelpText = "Enable Client Telemetry")]
-        public bool EnableTelemetry { get; set; }
+        [Option(Required = false, HelpText = "Disable Client Telemetry")]
+        public bool DisableTelemetry { get; set; }
 
         [Option(Required = false, HelpText = "Enable Distributed Tracing")]
         public bool EnableDistributedTracing { get; set; }
@@ -198,25 +198,9 @@ namespace CosmosBenchmark
                 MaxTcpConnectionsPerEndpoint = this.MaxTcpConnectionsPerEndpoint
             };
 
-            if (this.EnableTelemetry)
+            if (this.DisableTelemetry)
             {
-                Environment.SetEnvironmentVariable(
-                    Microsoft.Azure.Cosmos.Telemetry.ClientTelemetryOptions.EnvPropsClientTelemetryEnabled, 
-                    "true");
-
-                if (this.TelemetryScheduleInSec > 0)
-                {
-                    Environment.SetEnvironmentVariable(
-                        Microsoft.Azure.Cosmos.Telemetry.ClientTelemetryOptions.EnvPropsClientTelemetrySchedulingInSeconds, 
-                        Convert.ToString(this.TelemetryScheduleInSec));
-                }
-
-                if (!string.IsNullOrEmpty(this.TelemetryEndpoint))
-                {
-                    Environment.SetEnvironmentVariable(
-                        Microsoft.Azure.Cosmos.Telemetry.ClientTelemetryOptions.EnvPropsClientTelemetryEndpoint, 
-                        this.TelemetryEndpoint);
-                }
+                clientOptions.EnableClientTelemetry = false;
             }
 
             if (!string.IsNullOrWhiteSpace(this.ConsistencyLevel))

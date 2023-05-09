@@ -34,7 +34,8 @@ namespace Microsoft.Azure.Cosmos.Handler
             refreshInterval: DiagnosticsHandlerHelper.ClientTelemetryRefreshInterval);
 
         private static bool isDiagnosticsMonitoringEnabled = false;
-        
+        private static bool isTelemetryMonitoringEnabled = false;
+
         /// <summary>
         /// Singleton to make sure only one instance of DiagnosticHandlerHelper is there.
         /// The system usage collection is disabled for internal builds so it is set to null to avoid
@@ -56,7 +57,8 @@ namespace Microsoft.Azure.Cosmos.Handler
         private DiagnosticsHandlerHelper()
         {
             DiagnosticsHandlerHelper.isDiagnosticsMonitoringEnabled = false;
-
+            DiagnosticsHandlerHelper.isTelemetryMonitoringEnabled = false;
+            
             // If the CPU monitor fails for some reason don't block the application
             try
             {
@@ -69,12 +71,14 @@ namespace Microsoft.Azure.Cosmos.Handler
                 this.systemUsageMonitor = SystemUsageMonitor.CreateAndStart(recorders);
 
                 DiagnosticsHandlerHelper.isDiagnosticsMonitoringEnabled = true;
+                DiagnosticsHandlerHelper.isTelemetryMonitoringEnabled = true;
             }
             catch (Exception ex)
             {
                 DefaultTrace.TraceError(ex.Message);
 
                 DiagnosticsHandlerHelper.isDiagnosticsMonitoringEnabled = false;
+                DiagnosticsHandlerHelper.isTelemetryMonitoringEnabled = false;
             }
         }
 
@@ -108,7 +112,7 @@ namespace Microsoft.Azure.Cosmos.Handler
         /// <returns> CpuAndMemoryUsageRecorder</returns>
         public SystemUsageHistory GetClientTelemetrySystemHistory()
         {
-            if (!DiagnosticsHandlerHelper.isDiagnosticsMonitoringEnabled)
+            if (!DiagnosticsHandlerHelper.isTelemetryMonitoringEnabled)
             {
                 return null;
             }
@@ -120,7 +124,7 @@ namespace Microsoft.Azure.Cosmos.Handler
             catch (Exception ex)
             {
                 DefaultTrace.TraceError(ex.Message);
-                DiagnosticsHandlerHelper.isDiagnosticsMonitoringEnabled = false;
+                DiagnosticsHandlerHelper.isTelemetryMonitoringEnabled = false;
                 return null;
             }
         }

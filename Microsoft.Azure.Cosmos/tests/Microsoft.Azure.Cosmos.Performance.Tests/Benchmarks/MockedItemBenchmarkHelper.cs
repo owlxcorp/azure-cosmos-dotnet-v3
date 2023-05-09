@@ -41,7 +41,7 @@ namespace Microsoft.Azure.Cosmos.Performance.Tests.Benchmarks
             bool useBulk = false,
             bool? isClientTelemetryEnabled = null)
         {
-            if (isClientTelemetryEnabled.Value)
+            if (isClientTelemetryEnabled.HasValue && isClientTelemetryEnabled.Value)
             {
                 string EndpointUrl = "http://dummy.test.com/";
                 HttpClientHandlerHelper httpHandler = new HttpClientHandlerHelper
@@ -65,7 +65,7 @@ namespace Microsoft.Azure.Cosmos.Performance.Tests.Benchmarks
                                 ClientTelemetryConfiguration = new ClientTelemetryConfiguration
                                 {
                                     IsEnabled = true,
-                                    Endpoint = EndpointUrl // to avoid http call
+                                    Endpoint = EndpointUrl
                                 }
                             };
 
