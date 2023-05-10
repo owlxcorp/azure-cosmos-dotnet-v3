@@ -15,6 +15,8 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
     using System;
     using Microsoft.Azure.Cosmos.Routing;
     using System.Reflection;
+    using System.Threading;
+    using Microsoft.Azure.Cosmos.Telemetry;
 
     [TestClass]
     public class ClientTelemetryConfigurationTest : BaseCosmosClientHelper
@@ -25,9 +27,10 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
         [TestInitialize]
         public void TestInitialize()
         {
+            ClientTelemetryOptions.DefaultTimeStampInSeconds = TimeSpan.FromSeconds(1);
             this.cosmosClientBuilder = TestCommon.GetDefaultConfiguration();
         }
-
+        
         [TestCleanup]
         public async Task Cleanup()
         {
@@ -72,12 +75,9 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
 
             this.cosmosClientBuilder
                 .WithHttpClientFactory(() => new HttpClient(httpHandler));
-
             this.SetClient(this.cosmosClientBuilder.Build());
 
-            Database database = await this.GetClient().CreateDatabaseAsync(Guid.NewGuid().ToString());
-
-            Container container = (Container)await database.CreateContainerAsync(Guid.NewGuid().ToString(), "/pk");
+            this.database = await this.GetClient().CreateDatabaseAsync(Guid.NewGuid().ToString());
 
             if (isEnabled)
             {
@@ -94,6 +94,8 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
         [DataRow(false)]
         public async Task Validate_ClientTelemetryJob_When_Flag_Is_Switched(bool isEnabledInitially)
         {
+            ManualResetEvent manualResetEvent = new ManualResetEvent(false);
+            
             int counter = 0;
             HttpClientHandlerHelper httpHandler = new HttpClientHandlerHelper
             {
@@ -104,16 +106,22 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
                         counter++;
                         HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
 
-                        AccountClientConfigProperties clientConfigProperties = counter < 5
-                            ? new AccountClientConfigProperties
+                        AccountClientConfigProperties clientConfigProperties = null;
+
+                        if (counter < 5)
+                        {
+                            clientConfigProperties = new AccountClientConfigProperties
                             {
                                 ClientTelemetryConfiguration = new ClientTelemetryConfiguration
                                 {
                                     IsEnabled = isEnabledInitially,
                                     Endpoint = isEnabledInitially ? EndpointUrl : null
                                 }
-                            }
-                            : new AccountClientConfigProperties
+                            };
+                        }
+                        else
+                        {
+                            clientConfigProperties = new AccountClientConfigProperties
                             {
                                 ClientTelemetryConfiguration = new ClientTelemetryConfiguration
                                 {
@@ -121,10 +129,15 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
                                     Endpoint = !isEnabledInitially ? EndpointUrl : null
                                 }
                             };
+                        }
                         
+                        if (counter == 8)
+                        {
+                            manualResetEvent.Set();
+                        }
                         string payload = JsonConvert.SerializeObject(clientConfigProperties);
                         result.Content = new StringContent(payload, Encoding.UTF8, "application/json");
-                        
+                       
                         return Task.FromResult(result);
                     }
                     return null;
@@ -133,13 +146,12 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
 
             this.cosmosClientBuilder
                 .WithHttpClientFactory(() => new HttpClient(httpHandler));
-
             this.SetClient(this.cosmosClientBuilder.Build());
 
             FieldInfo field = typeof(GlobalEndpointManager).GetField("backgroundRefreshAccountClientConfigTimeIntervalInMS", BindingFlags.Instance | BindingFlags.NonPublic);
             field.SetValue(this.GetClient().DocumentClient.GlobalEndpointManager, 10);
 
-            Database database = await this.GetClient().CreateDatabaseAsync(Guid.NewGuid().ToString());
+            this.database = await this.GetClient().CreateDatabaseAsync(Guid.NewGuid().ToString());
 
             if (isEnabledInitially)
             {
@@ -149,8 +161,8 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
             {
                 Assert.IsNull(this.GetClient().DocumentClient.ClientTelemetryTask, "Before: Client Telemetry Job should be Stopped");
             }
-            
-            await Task.Delay(TimeSpan.FromMilliseconds(100));
+
+            manualResetEvent.WaitOne(TimeSpan.FromMilliseconds(100));
             
             if (isEnabledInitially)
             {
