@@ -346,7 +346,7 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
 
         [TestMethod]
         [DataRow(ConnectionMode.Direct)]
-        //[DataRow(ConnectionMode.Gateway)]
+        [DataRow(ConnectionMode.Gateway)]
         public async Task BatchOperationsTest(ConnectionMode mode)
         {
             Container container = await this.CreateClientAndContainer(mode, Microsoft.Azure.Cosmos.ConsistencyLevel.Eventual); // Client level consistency

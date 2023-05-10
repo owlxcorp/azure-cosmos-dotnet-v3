@@ -15,198 +15,40 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
     using System;
     using Microsoft.Azure.Cosmos.Routing;
     using System.Reflection;
-    using System.Threading;
-    using System.Diagnostics;
-    using Castle.Components.DictionaryAdapter;
 
     [TestClass]
-    public class ClientTelemetryConfigurationTest 
+    public class ClientTelemetryConfigurationTest : BaseCosmosClientHelper
     {
         private const string EndpointUrl = "http://dummy.test.com/";
-
+        private CosmosClientBuilder cosmosClientBuilder;
 
         [TestInitialize]
         public void TestInitialize()
         {
-            
+            this.cosmosClientBuilder = TestCommon.GetDefaultConfiguration();
         }
 
-        /*  [TestMethod]
-          public async Task Validate_ClientTelemetryJob_Is_Running_if_EnabledAsync()
-          {
-              HttpClientHandlerHelper httpHandler = new HttpClientHandlerHelper
-              {
-                  RequestCallBack = (request, cancellation) =>
-                  {
-                      if (request.RequestUri.AbsoluteUri.Equals(EndpointUrl))
-                      {
-                          HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
-                          return Task.FromResult(result);
-                      }
-                      else if (request.RequestUri.AbsoluteUri.Contains(Documents.Paths.ClientConfigPathSegment))
-                      {
-                          HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
-
-                          AccountClientConfigProperties clientConfigProperties = new AccountClientConfigProperties
-                          {
-                              ClientTelemetryConfiguration = new ClientTelemetryConfiguration
-                              {
-                                  IsEnabled = true,
-                                  Endpoint = EndpointUrl
-                              }
-                          };
-
-                          string payload = JsonConvert.SerializeObject(clientConfigProperties);
-                          result.Content = new StringContent(payload, Encoding.UTF8, "application/json");
-
-                          return Task.FromResult(result);
-                      }
-                      return null;
-                  }
-              };
-
-              this.cosmosClientBuilder
-                  .WithHttpClientFactory(() => new HttpClient(httpHandler));
-
-              this.SetClient(this.cosmosClientBuilder.Build());
-
-              Database database = await this.GetClient().CreateDatabaseAsync(Guid.NewGuid().ToString());
-
-              Container container = (Container)await database.CreateContainerAsync(Guid.NewGuid().ToString(), "/pk");
-
-              ToDoActivity testItem = ToDoActivity.CreateRandomToDoActivity("MyTestPkValue");
-              ItemResponse<ToDoActivity> createResponse = await container.CreateItemAsync<ToDoActivity>(testItem);
-
-              Assert.IsNotNull(this.GetClient().DocumentClient.ClientTelemetryTask);
-          }*/
-
-        /* [TestMethod]
-         public async Task Validate_ClientTelemetryJob_Is_Not_Running_if_Disabled()
-         {
-             HttpClientHandlerHelper httpHandler = new HttpClientHandlerHelper
-             {
-                 RequestCallBack = (request, cancellation) =>
-                 {
-                     if (request.RequestUri.AbsoluteUri.Contains(Documents.Paths.ClientConfigPathSegment))
-                     {
-                         HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
-
-                         AccountClientConfigProperties clientConfigProperties = new AccountClientConfigProperties
-                         {
-                             ClientTelemetryConfiguration = new ClientTelemetryConfiguration
-                             {
-                                 IsEnabled = false,
-                                 Endpoint = EndpointUrl
-                             }
-                         };
-
-                         string payload = JsonConvert.SerializeObject(clientConfigProperties);
-                         result.Content = new StringContent(payload, Encoding.UTF8, "application/json");
-
-                         return Task.FromResult(result);
-                     }
-                     return null;
-                 }
-             };
-
-             this.cosmosClientBuilder
-                 .WithHttpClientFactory(() => new HttpClient(httpHandler));
-
-             this.SetClient(this.cosmosClientBuilder.Build());
-             Database database = await this.GetClient().CreateDatabaseAsync(Guid.NewGuid().ToString());
-
-             Container container = (Container)await database.CreateContainerAsync(Guid.NewGuid().ToString(), "/pk");
-
-             ToDoActivity testItem = ToDoActivity.CreateRandomToDoActivity("MyTestPkValue");
-             ItemResponse<ToDoActivity> createResponse = await container.CreateItemAsync<ToDoActivity>(testItem);
-
-             Assert.IsNull(this.GetClient().DocumentClient.ClientTelemetryTask);
-         }
- */
-
-        public virtual int c { set; get; }
+        [TestCleanup]
+        public async Task Cleanup()
+        {
+            await base.TestCleanup();
+        }
 
         [TestMethod]
-        public async Task Validate_ClientTelemetryJob_Is_Stopping_if_First_Enabled_Then_Disabled()
+        [DataRow(true)]
+        [DataRow(false)]
+        public async Task Validate_ClientTelemetryJob_Status_if_Enabled_Or_DisabledAsync(bool isEnabled)
         {
-            CosmosClientBuilder cosmosClientBuilder = TestCommon.GetDefaultConfiguration();
-            Console.WriteLine("Thread Id : " + Thread.CurrentThread.ManagedThreadId + " Thread Name : " + Thread.CurrentThread.Name);
-  
-            Stopwatch watch = Stopwatch.StartNew();
             HttpClientHandlerHelper httpHandler = new HttpClientHandlerHelper
             {
                 RequestCallBack = (request, cancellation) =>
                 {
-                    Console.WriteLine(request.RequestUri.AbsoluteUri);
-                    Console.WriteLine("Thread Id : " + Thread.CurrentThread.ManagedThreadId + " Thread Name : " + Thread.CurrentThread.Name);
-                    if (request.RequestUri.AbsoluteUri.Contains(Documents.Paths.ClientConfigPathSegment))
+                    if (request.RequestUri.AbsoluteUri.Equals(EndpointUrl))
                     {
-                        Console.WriteLine(this.c++);
-                        Console.WriteLine(" ElapsedMilliseconds => " + watch.ElapsedMilliseconds);
-
                         HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
-
-                        AccountClientConfigProperties clientConfigProperties = new AccountClientConfigProperties
-                        {
-                            ClientTelemetryConfiguration = new ClientTelemetryConfiguration
-                            {
-                                IsEnabled = true,
-                                Endpoint = EndpointUrl
-                            }
-                        };
-                        if (this.c > 5)
-                        {
-                            clientConfigProperties = new AccountClientConfigProperties
-                            {
-                                ClientTelemetryConfiguration = new ClientTelemetryConfiguration
-                                {
-                                    IsEnabled = false,
-                                    Endpoint = null
-                                }
-                            };
-                        }
-
-                        Console.WriteLine("ClientTelemetry flag is enabled " + clientConfigProperties.ClientTelemetryConfiguration.IsEnabled);
-                        string payload = JsonConvert.SerializeObject(clientConfigProperties);
-                        result.Content = new StringContent(payload, Encoding.UTF8, "application/json");
-
                         return Task.FromResult(result);
                     }
-                    return null;
-                }
-            };
-
-            cosmosClientBuilder
-                .WithHttpClientFactory(() => new HttpClient(httpHandler));
-
-            CosmosClient client = cosmosClientBuilder.Build();
-/*
-            FieldInfo field = typeof(GlobalEndpointManager).GetField("backgroundRefreshAccountClientConfigTimeIntervalInMS", BindingFlags.Instance | BindingFlags.NonPublic);
-            field.SetValue(client.DocumentClient.GlobalEndpointManager, 10);
-*/
-            Database database = await client.CreateDatabaseAsync(Guid.NewGuid().ToString());
-
-            Container container = (Container)await database.CreateContainerAsync(Guid.NewGuid().ToString(), "/pk");
-
-            ToDoActivity testItem = ToDoActivity.CreateRandomToDoActivity("MyTestPkValue");
-            ItemResponse<ToDoActivity> createResponse = await container.CreateItemAsync<ToDoActivity>(testItem);
-
-            Assert.IsNotNull(client.DocumentClient.ClientTelemetryTask);
-
-            //await Task.Delay(TimeSpan.FromMilliseconds(100));
-            
-            //Assert.IsNull(client.DocumentClient.ClientTelemetryTask);
-        }
-
-       /* [TestMethod]
-        public async Task Validate_ClientTelemetryJob_Is_Starting_if_First_Disabled_Then_Enabled()
-        {
-            int counter = 0;
-            HttpClientHandlerHelper httpHandler = new HttpClientHandlerHelper
-            {
-                RequestCallBack = (request, cancellation) =>
-                {
-                    if (request.RequestUri.AbsoluteUri.Contains(Documents.Paths.ClientConfigPathSegment))
+                    else if (request.RequestUri.AbsoluteUri.Contains(Documents.Paths.ClientConfigPathSegment))
                     {
                         HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
 
@@ -214,26 +56,14 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
                         {
                             ClientTelemetryConfiguration = new ClientTelemetryConfiguration
                             {
-                                IsEnabled = false,
-                                Endpoint = null
+                                IsEnabled = isEnabled,
+                                Endpoint = isEnabled ? EndpointUrl: null
                             }
                         };
-                        if (counter > 5)
-                        {
-                            clientConfigProperties = new AccountClientConfigProperties
-                            {
-                                ClientTelemetryConfiguration = new ClientTelemetryConfiguration
-                                {
-                                    IsEnabled = true,
-                                    Endpoint = EndpointUrl
-                                }
-                            };
-                        }
 
                         string payload = JsonConvert.SerializeObject(clientConfigProperties);
                         result.Content = new StringContent(payload, Encoding.UTF8, "application/json");
 
-                        counter++;
                         return Task.FromResult(result);
                     }
                     return null;
@@ -249,14 +79,88 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
 
             Container container = (Container)await database.CreateContainerAsync(Guid.NewGuid().ToString(), "/pk");
 
-            ToDoActivity testItem = ToDoActivity.CreateRandomToDoActivity("MyTestPkValue");
-            ItemResponse<ToDoActivity> createResponse = await container.CreateItemAsync<ToDoActivity>(testItem);
+            if (isEnabled)
+            {
+                Assert.IsNotNull(this.GetClient().DocumentClient.ClientTelemetryTask);
+            }
+            else
+            {
+                Assert.IsNull(this.GetClient().DocumentClient.ClientTelemetryTask);
+            }
+        }
+        
+        [TestMethod]
+        [DataRow(true)]
+        [DataRow(false)]
+        public async Task Validate_ClientTelemetryJob_When_Flag_Is_Switched(bool isEnabledInitially)
+        {
+            int counter = 0;
+            HttpClientHandlerHelper httpHandler = new HttpClientHandlerHelper
+            {
+                RequestCallBack = (request, cancellation) =>
+                {
+                    if (request.RequestUri.AbsoluteUri.Contains(Documents.Paths.ClientConfigPathSegment))
+                    {
+                        counter++;
+                        HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
 
-            Assert.IsNull(this.GetClient().DocumentClient.ClientTelemetryTask);
+                        AccountClientConfigProperties clientConfigProperties = counter < 5
+                            ? new AccountClientConfigProperties
+                            {
+                                ClientTelemetryConfiguration = new ClientTelemetryConfiguration
+                                {
+                                    IsEnabled = isEnabledInitially,
+                                    Endpoint = isEnabledInitially ? EndpointUrl : null
+                                }
+                            }
+                            : new AccountClientConfigProperties
+                            {
+                                ClientTelemetryConfiguration = new ClientTelemetryConfiguration
+                                {
+                                    IsEnabled = !isEnabledInitially,
+                                    Endpoint = !isEnabledInitially ? EndpointUrl : null
+                                }
+                            };
+                        
+                        string payload = JsonConvert.SerializeObject(clientConfigProperties);
+                        result.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+                        
+                        return Task.FromResult(result);
+                    }
+                    return null;
+                }
+            };
 
+            this.cosmosClientBuilder
+                .WithHttpClientFactory(() => new HttpClient(httpHandler));
+
+            this.SetClient(this.cosmosClientBuilder.Build());
+
+            FieldInfo field = typeof(GlobalEndpointManager).GetField("backgroundRefreshAccountClientConfigTimeIntervalInMS", BindingFlags.Instance | BindingFlags.NonPublic);
+            field.SetValue(this.GetClient().DocumentClient.GlobalEndpointManager, 10);
+
+            Database database = await this.GetClient().CreateDatabaseAsync(Guid.NewGuid().ToString());
+
+            if (isEnabledInitially)
+            {
+                Assert.IsNotNull(this.GetClient().DocumentClient.ClientTelemetryTask, "Before: Client Telemetry Job should be Running");
+            }
+            else
+            {
+                Assert.IsNull(this.GetClient().DocumentClient.ClientTelemetryTask, "Before: Client Telemetry Job should be Stopped");
+            }
+            
             await Task.Delay(TimeSpan.FromMilliseconds(100));
-
-            Assert.IsNotNull(this.GetClient().DocumentClient.ClientTelemetryTask);
-        }*/
+            
+            if (isEnabledInitially)
+            {
+                Assert.IsNull(this.GetClient().DocumentClient.ClientTelemetryTask, "After: Client Telemetry Job should be Stopped");
+            }
+            else
+            {
+                Assert.IsNotNull(this.GetClient().DocumentClient.ClientTelemetryTask, "After: Client Telemetry Job should be Running");
+            }
+            
+        }
     }
 }
