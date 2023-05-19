@@ -662,7 +662,7 @@ namespace Microsoft.Azure.Cosmos
                     storeModel: this.GatewayStoreModel, 
                     tokenProvider: this, 
                     retryPolicy: this.retryPolicy,
-                    clientTelemetry: this.ClientTelemetryTask);
+                    clientTelemetry: this.ClientTelemetryInstance);
                 this.partitionKeyRangeCache = new PartitionKeyRangeCache(this, this.GatewayStoreModel, this.collectionCache);
 
                 DefaultTrace.TraceWarning("{0} occurred while OpenAsync. Exception Message: {1}", ex.ToString(), ex.Message);
@@ -1024,7 +1024,7 @@ namespace Microsoft.Azure.Cosmos
                     storeModel: this.GatewayStoreModel, 
                     tokenProvider: this, 
                     retryPolicy: this.retryPolicy,
-                    clientTelemetry: this.ClientTelemetryTask);
+                    clientTelemetry: this.ClientTelemetryInstance);
             this.partitionKeyRangeCache = new PartitionKeyRangeCache(this, this.GatewayStoreModel, this.collectionCache);
             this.ResetSessionTokenRetryPolicy = new ResetSessionTokenRetryPolicyFactory(this.sessionContainer, this.collectionCache, this.retryPolicy);
 
@@ -1049,11 +1049,11 @@ namespace Microsoft.Azure.Cosmos
         {
             if (databaseAccountClientConfigs.IsClientTelemetryEnabled() && this.ConnectionPolicy.EnableClientTelemetry)
             {
-                if (this.ClientTelemetryTask == null)
+                if (this.ClientTelemetryInstance == null)
                 {
                     try
                     {
-                        this.ClientTelemetryTask = ClientTelemetry.CreateAndStartBackgroundTelemetry(
+                        this.ClientTelemetryInstance = ClientTelemetry.CreateAndStartBackgroundTelemetry(
                             clientId: this.clientId,
                             httpClient: this.httpClient,
                             userAgent: this.ConnectionPolicy.UserAgentContainer.BaseUserAgent,
@@ -1079,12 +1079,12 @@ namespace Microsoft.Azure.Cosmos
             }
             else
             {
-                if (this.ClientTelemetryTask != null)
+                if (this.ClientTelemetryInstance != null)
                 {
                     DefaultTrace.TraceInformation("Stopping Client Telemetry Job.");
                     
-                    this.ClientTelemetryTask.Dispose();
-                    this.ClientTelemetryTask = null;
+                    this.ClientTelemetryInstance.Dispose();
+                    this.ClientTelemetryInstance = null;
                 }
                 else
                 {
@@ -1369,10 +1369,10 @@ namespace Microsoft.Azure.Cosmos
                 this.accountClientConfigTask = null;
             }
             
-            if (this.ClientTelemetryTask != null)
+            if (this.ClientTelemetryInstance != null)
             {
-                this.ClientTelemetryTask.Dispose();
-                this.ClientTelemetryTask = null;
+                this.ClientTelemetryInstance.Dispose();
+                this.ClientTelemetryInstance = null;
             }
 
             DefaultTrace.TraceInformation("DocumentClient with id {0} disposed.", this.traceId);
@@ -1422,7 +1422,7 @@ namespace Microsoft.Azure.Cosmos
 
         internal virtual Task<QueryPartitionProvider> QueryPartitionProvider => this.queryPartitionProvider.Value;
 
-        public ClientTelemetry ClientTelemetryTask { get; set; }
+        public ClientTelemetry ClientTelemetryInstance { get; set; }
 
         internal virtual async Task<ConsistencyLevel> GetDefaultConsistencyLevelAsync()
         {

@@ -30,11 +30,11 @@ namespace Microsoft.Azure.Cosmos.Handlers
             ResponseMessage response = await base.SendAsync(request, cancellationToken);
 
             // Check if this particular operation is eligible for client telemetry collection
-            if (this.Client.DocumentClient.ClientTelemetryTask != null && this.IsAllowed(request))
+            if (this.Client.DocumentClient.ClientTelemetryInstance != null && this.IsAllowed(request))
             {
                 try
                 {
-                    this.Client.DocumentClient.ClientTelemetryTask
+                    this.Client.DocumentClient.ClientTelemetryInstance
                         .CollectOperationInfo(
                                 cosmosDiagnostics: response.Diagnostics,
                                 statusCode: response.StatusCode,

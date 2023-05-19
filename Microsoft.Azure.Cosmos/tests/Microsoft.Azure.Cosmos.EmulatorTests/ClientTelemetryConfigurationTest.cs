@@ -81,11 +81,11 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
 
             if (isEnabled)
             {
-                Assert.IsNotNull(this.GetClient().DocumentClient.ClientTelemetryTask);
+                Assert.IsNotNull(this.GetClient().DocumentClient.ClientTelemetryInstance);
             }
             else
             {
-                Assert.IsNull(this.GetClient().DocumentClient.ClientTelemetryTask);
+                Assert.IsNull(this.GetClient().DocumentClient.ClientTelemetryInstance);
             }
         }
         
@@ -155,22 +155,22 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
 
             if (isEnabledInitially)
             {
-                Assert.IsNotNull(this.GetClient().DocumentClient.ClientTelemetryTask, "Before: Client Telemetry Job should be Running");
+                Assert.IsNotNull(this.GetClient().DocumentClient.ClientTelemetryInstance, "Before: Client Telemetry Job should be Running");
             }
             else
             {
-                Assert.IsNull(this.GetClient().DocumentClient.ClientTelemetryTask, "Before: Client Telemetry Job should be Stopped");
+                Assert.IsNull(this.GetClient().DocumentClient.ClientTelemetryInstance, "Before: Client Telemetry Job should be Stopped");
             }
 
             manualResetEvent.WaitOne(TimeSpan.FromMilliseconds(100));
             
             if (isEnabledInitially)
             {
-                Assert.IsNull(this.GetClient().DocumentClient.ClientTelemetryTask, "After: Client Telemetry Job should be Stopped");
+                Assert.IsNull(this.GetClient().DocumentClient.ClientTelemetryInstance, "After: Client Telemetry Job should be Stopped");
             }
             else
             {
-                Assert.IsNotNull(this.GetClient().DocumentClient.ClientTelemetryTask, "After: Client Telemetry Job should be Running");
+                Assert.IsNotNull(this.GetClient().DocumentClient.ClientTelemetryInstance, "After: Client Telemetry Job should be Running");
             }
             
         }
