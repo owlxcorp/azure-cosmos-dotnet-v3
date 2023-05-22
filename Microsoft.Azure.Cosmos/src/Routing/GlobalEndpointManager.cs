@@ -532,7 +532,7 @@ namespace Microsoft.Azure.Cosmos.Routing
                 {
                     return;
                 }
-                await this.owner.RefreshDatabaseAccountClientConfigInternalAsync(new Uri(this.defaultEndpoint + Paths.ClientConfigPathSegment));
+                await this.owner.RefreshDatabaseAccountClientConfigInternalAsync();
             }
             catch (Exception ex)
             {

@@ -1069,8 +1069,7 @@ namespace Microsoft.Azure.Cosmos
                     }
                     catch (Exception ex)
                     {
-                        DefaultTrace.TraceWarning($"Error While starting Telemetry Job : {ex.Message}. Hence disabling Client Telemetry");
-                        this.ConnectionPolicy.EnableClientTelemetry = false;
+                        DefaultTrace.TraceWarning($"Error While starting Telemetry Job : {ex.Message}");
                     }
                 }
                 else
@@ -1423,7 +1422,7 @@ namespace Microsoft.Azure.Cosmos
 
         internal virtual Task<QueryPartitionProvider> QueryPartitionProvider => this.queryPartitionProvider.Value;
 
-        public ClientTelemetry ClientTelemetryInstance { get; set; }
+        public ClientTelemetry ClientTelemetryInstance { get; private set; }
 
         internal virtual async Task<ConsistencyLevel> GetDefaultConsistencyLevelAsync()
         {
@@ -6460,10 +6459,12 @@ namespace Microsoft.Azure.Cosmos
             return TaskHelper.InlineIfPossible(() => this.GetDatabaseAccountPrivateAsync(this.ReadEndpoint), this.ResetSessionTokenRetryPolicy.GetRequestPolicy());
         }
         
-        async Task IDocumentClientInternal.RefreshDatabaseAccountClientConfigInternalAsync(Uri serviceEndpoint)
+        async Task IDocumentClientInternal.RefreshDatabaseAccountClientConfigInternalAsync()
         {
             if (this.GatewayStoreModel is GatewayStoreModel gatewayModel)
             {
+                Uri serviceEndpoint = new Uri(this.ServiceEndpoint + Paths.ClientConfigPathSegment);
+                
                 async ValueTask<HttpRequestMessage> CreateRequestMessage()
                 {
                     HttpRequestMessage request = new HttpRequestMessage
@@ -6795,7 +6796,6 @@ namespace Microsoft.Azure.Cosmos
                     cancellationToken: this.cancellationTokenSource.Token);
 
             this.accountServiceConfiguration = new CosmosAccountServiceConfiguration(accountReader.InitializeReaderAsync);
-
             await this.accountServiceConfiguration.InitializeAsync();
             AccountProperties accountProperties = this.accountServiceConfiguration.AccountProperties;
             this.UseMultipleWriteLocations = this.ConnectionPolicy.UseMultipleWriteLocations && accountProperties.EnableMultipleWriteLocations;
@@ -6805,12 +6805,14 @@ namespace Microsoft.Azure.Cosmos
             // Disable system usage for internal builds. Cosmos DB owns the VMs and already logs
             // the system information so no need to track it.
 #if !INTERNAL
-            TryCatch<AccountClientConfigProperties> accountClientConfigProperties = await accountReader.GetDatabaseAccountClientConfigAsync(new Uri(this.ServiceEndpoint + Paths.ClientConfigPathSegment));
-            // Safety check to make sure, client initialization won't fail if this API is not available
+            TryCatch<AccountClientConfigProperties> accountClientConfigProperties = await accountReader.GetDatabaseAccountClientConfigAsync();
+            // Make sure to intialize the client telemetry job if the client config is available
             if (accountClientConfigProperties.Succeeded)
             {
                 this.InitializeClientTelemetry(accountClientConfigProperties.Result);
             }
+            
+            // No matter what, start the background job to retry calling client config API
             this.GlobalEndpointManager.InitializeClientTelemetryTaskAndStartBackgroundRefresh();
 #endif
         }

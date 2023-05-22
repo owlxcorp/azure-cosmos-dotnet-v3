@@ -87,12 +87,14 @@ namespace Microsoft.Azure.Cosmos
             }
         }
 
-        public async Task<TryCatch<AccountClientConfigProperties>> GetDatabaseAccountClientConfigAsync(Uri serviceEndpoint)
+        public async Task<TryCatch<AccountClientConfigProperties>> GetDatabaseAccountClientConfigAsync()
         {
+            Uri clientConfigEndpoint = new Uri(this.serviceEndpoint + Paths.ClientConfigPathSegment);
+            
             INameValueCollection headers = new RequestNameValueCollection();
             await this.cosmosAuthorization.AddAuthorizationHeaderAsync(
                 headersCollection: headers,
-                serviceEndpoint,
+                clientConfigEndpoint,
                 HttpConstants.HttpMethods.Get,
                 AuthorizationTokenType.PrimaryMasterKey);
 
@@ -101,7 +103,7 @@ namespace Microsoft.Azure.Cosmos
                 try
                 {
                     using (HttpResponseMessage responseMessage = await this.httpClient.GetAsync(
-                        uri: serviceEndpoint,
+                        uri: clientConfigEndpoint,
                         additionalHeaders: headers,
                         resourceType: ResourceType.DatabaseAccount,
                         timeoutPolicy: HttpTimeoutPolicyControlPlaneRead.Instance,
@@ -114,7 +116,7 @@ namespace Microsoft.Azure.Cosmos
                 }
                 catch (ObjectDisposedException ex) when (this.cancellationToken.IsCancellationRequested)
                 {
-                    DefaultTrace.TraceWarning($"Client is being disposed for {serviceEndpoint} at {DateTime.UtcNow}, cancelling client config call.");
+                    DefaultTrace.TraceWarning($"Client is being disposed for {clientConfigEndpoint} at {DateTime.UtcNow}, cancelling client config call.");
                     return TryCatch<AccountClientConfigProperties>.FromException(ex);
                 }
                 catch (Exception ex)
