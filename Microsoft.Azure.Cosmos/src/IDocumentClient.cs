@@ -80,9 +80,9 @@ namespace Microsoft.Azure.Cosmos
         Documents.ConsistencyLevel ConsistencyLevel { get; }
 
         /// <summary>
-        /// Gets Client Telemetry Task Instance
+        /// Gets Client Telemetry Instance with Task
         /// </summary>
-        ClientTelemetry ClientTelemetryInstance { get; set; }
+        ClientTelemetry ClientTelemetryInstance { get; }
         
         #endregion
 

@@ -15,7 +15,7 @@ namespace Microsoft.Azure.Cosmos.Handlers
     internal class TelemetryHandler : RequestHandler
     {
         private readonly CosmosClient Client;
-
+        
         public TelemetryHandler(CosmosClient client)
         {
             this.Client = client ?? throw new ArgumentNullException(nameof(client));
@@ -25,16 +25,14 @@ namespace Microsoft.Azure.Cosmos.Handlers
             RequestMessage request,
             CancellationToken cancellationToken)
         {
-            await this.Client.DocumentClient.EnsureValidClientAsync(NoOpTrace.Singleton);
-
             ResponseMessage response = await base.SendAsync(request, cancellationToken);
 
             // Check if this particular operation is eligible for client telemetry collection
-            if (this.Client.DocumentClient.ClientTelemetryInstance != null && this.IsAllowed(request))
+            if (this.IsEligibleForTelemetryCollection(request, out ClientTelemetry clientTelemetryJob))
             {
                 try
                 {
-                    this.Client.DocumentClient.ClientTelemetryInstance
+                    clientTelemetryJob
                         .CollectOperationInfo(
                                 cosmosDiagnostics: response.Diagnostics,
                                 statusCode: response.StatusCode,
@@ -57,7 +55,38 @@ namespace Microsoft.Azure.Cosmos.Handlers
             return response;
         }
 
-        private bool IsAllowed(RequestMessage request)
+        /// <summary>
+        /// Check if Collection should happen or not, if yes then return the client job instance where information needs to send
+        /// </summary>
+        /// <param name="request"></param>
+        /// <param name="clientTelemetryJob"></param>
+        /// <returns>true/false</returns>
+        private bool IsEligibleForTelemetryCollection(RequestMessage request, out ClientTelemetry clientTelemetryJob)
+        {
+            return this.IsClientTelemetryJobRunning(out clientTelemetryJob) && this.IsRequestAllowed(request);
+        }
+
+        /// <summary>
+        /// Check if Client Telemetry Job is running in background.
+        /// </summary>
+        /// <param name="clientTelemetryJob"></param>
+        /// <returns>true/false</returns>
+        private bool IsClientTelemetryJobRunning(out ClientTelemetry clientTelemetryJob)
+        {
+            clientTelemetryJob = this.Client.DocumentClient.ClientTelemetryInstance;
+            if (this.Client.DocumentClient.ClientTelemetryInstance == null)
+            {
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Check if Passed request id eligible for client telemetry collection
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns>true/false</returns>
+        private bool IsRequestAllowed(RequestMessage request)
         { 
             return ClientTelemetryOptions.AllowedResourceTypes.Equals(request.ResourceType);
         }

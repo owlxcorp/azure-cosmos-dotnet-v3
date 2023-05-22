@@ -6,9 +6,11 @@ namespace Microsoft.Azure.Cosmos
 {
     using System;
     using System.Net.Http;
+    using System.Runtime.InteropServices;
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft.Azure.Cosmos.Core.Trace;
+    using Microsoft.Azure.Cosmos.Query.Core.Monads;
     using Microsoft.Azure.Cosmos.Resource.CosmosExceptions;
     using Microsoft.Azure.Cosmos.Resource.Settings;
     using Microsoft.Azure.Cosmos.Routing;
@@ -85,7 +87,7 @@ namespace Microsoft.Azure.Cosmos
             }
         }
 
-        public async Task<AccountClientConfigProperties> GetDatabaseAccountClientConfigAsync(Uri serviceEndpoint)
+        public async Task<TryCatch<AccountClientConfigProperties>> GetDatabaseAccountClientConfigAsync(Uri serviceEndpoint)
         {
             INameValueCollection headers = new RequestNameValueCollection();
             await this.cosmosAuthorization.AddAuthorizationHeaderAsync(
@@ -107,19 +109,19 @@ namespace Microsoft.Azure.Cosmos
                         cancellationToken: default))
                     using (DocumentServiceResponse documentServiceResponse = await ClientExtensions.ParseResponseAsync(responseMessage))
                     {
-                        return CosmosResource.FromStream<AccountClientConfigProperties>(documentServiceResponse);
+                        return TryCatch<AccountClientConfigProperties>.FromResult(CosmosResource.FromStream<AccountClientConfigProperties>(documentServiceResponse));
                     }
                 }
-                catch (ObjectDisposedException) when (this.cancellationToken.IsCancellationRequested)
+                catch (ObjectDisposedException ex) when (this.cancellationToken.IsCancellationRequested)
                 {
-                    DefaultTrace.TraceWarning($"Client is being disposed for {serviceEndpoint} at {DateTime.UtcNow}, cancelling further operations.");
+                    DefaultTrace.TraceWarning($"Client is being disposed for {serviceEndpoint} at {DateTime.UtcNow}, cancelling client config call.");
+                    return TryCatch<AccountClientConfigProperties>.FromException(ex);
                 }
                 catch (Exception ex)
                 {
                     DefaultTrace.TraceWarning($"Exception while calling client config " + ex.StackTrace);
+                    return TryCatch<AccountClientConfigProperties>.FromException(ex);
                 }
-
-                return null;
             }
         }
 

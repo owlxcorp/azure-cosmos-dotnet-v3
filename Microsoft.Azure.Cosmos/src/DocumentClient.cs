@@ -22,6 +22,7 @@ namespace Microsoft.Azure.Cosmos
     using Microsoft.Azure.Cosmos.Core.Trace;
     using Microsoft.Azure.Cosmos.Handler;
     using Microsoft.Azure.Cosmos.Query;
+    using Microsoft.Azure.Cosmos.Query.Core.Monads;
     using Microsoft.Azure.Cosmos.Query.Core.QueryPlan;
     using Microsoft.Azure.Cosmos.Resource.Settings;
     using Microsoft.Azure.Cosmos.Routing;
@@ -6486,10 +6487,12 @@ namespace Microsoft.Azure.Cosmos
                     return request;
                 }
 
-                AccountClientConfigProperties databaseAccountClientConfigs = await gatewayModel.GetDatabaseAccountClientConfigAsync(CreateRequestMessage,
+                TryCatch<AccountClientConfigProperties> databaseAccountClientConfigs = await gatewayModel.GetDatabaseAccountClientConfigAsync(CreateRequestMessage,
                                                                                             clientSideRequestStatistics: null);
-                    
-                this.InitializeClientTelemetry(databaseAccountClientConfigs);
+                if (databaseAccountClientConfigs.Succeeded)
+                {
+                    this.InitializeClientTelemetry(databaseAccountClientConfigs.Result);
+                }
             }
         }
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
@@ -6802,11 +6805,11 @@ namespace Microsoft.Azure.Cosmos
             // Disable system usage for internal builds. Cosmos DB owns the VMs and already logs
             // the system information so no need to track it.
 #if !INTERNAL
-            AccountClientConfigProperties accountClientConfigProperties = await accountReader.GetDatabaseAccountClientConfigAsync(new Uri(this.ServiceEndpoint + Paths.ClientConfigPathSegment));
+            TryCatch<AccountClientConfigProperties> accountClientConfigProperties = await accountReader.GetDatabaseAccountClientConfigAsync(new Uri(this.ServiceEndpoint + Paths.ClientConfigPathSegment));
             // Safety check to make sure, client initialization won't fail if this API is not available
-            if (accountClientConfigProperties != null)
+            if (accountClientConfigProperties.Succeeded)
             {
-                this.InitializeClientTelemetry(accountClientConfigProperties);
+                this.InitializeClientTelemetry(accountClientConfigProperties.Result);
             }
             this.GlobalEndpointManager.InitializeClientTelemetryTaskAndStartBackgroundRefresh();
 #endif
