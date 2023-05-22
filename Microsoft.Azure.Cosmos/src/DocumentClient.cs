@@ -6798,7 +6798,7 @@ namespace Microsoft.Azure.Cosmos
             this.UseMultipleWriteLocations = this.ConnectionPolicy.UseMultipleWriteLocations && accountProperties.EnableMultipleWriteLocations;
             
             this.GlobalEndpointManager.InitializeAccountPropertiesAndStartBackgroundRefresh(accountProperties);
-
+  
             // Disable system usage for internal builds. Cosmos DB owns the VMs and already logs
             // the system information so no need to track it.
 #if !INTERNAL
@@ -6807,8 +6807,8 @@ namespace Microsoft.Azure.Cosmos
             if (accountClientConfigProperties != null)
             {
                 this.InitializeClientTelemetry(accountClientConfigProperties);
-                this.GlobalEndpointManager.InitializeClientTelemetryTaskAndStartBackgroundRefresh();
             }
+            this.GlobalEndpointManager.InitializeClientTelemetryTaskAndStartBackgroundRefresh();
 #endif
         }
 
