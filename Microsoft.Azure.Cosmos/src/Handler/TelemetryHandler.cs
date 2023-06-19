@@ -74,7 +74,7 @@ namespace Microsoft.Azure.Cosmos.Handlers
         private bool IsClientTelemetryJobRunning(out ClientTelemetry clientTelemetryJob)
         {
             clientTelemetryJob = this.Client.DocumentClient.ClientTelemetryInstance;
-            if (this.Client.DocumentClient.ClientTelemetryInstance == null)
+            if (clientTelemetryJob == null)
             {
                 return false;
             }
