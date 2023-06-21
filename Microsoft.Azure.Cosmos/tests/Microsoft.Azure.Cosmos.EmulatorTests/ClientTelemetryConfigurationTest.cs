@@ -38,6 +38,99 @@ namespace Microsoft.Azure.Cosmos.SDK.EmulatorTests
         }
 
         [TestMethod]
+        public async Task Validate_ClientTelemetryJob_Status_if_Disabled_At_Instance_LevelAsync()
+        {
+            HttpClientHandlerHelper httpHandler = new HttpClientHandlerHelper
+            {
+                RequestCallBack = (request, cancellation) =>
+                {
+                    if (request.RequestUri.AbsoluteUri.Equals(EndpointUrl))
+                    {
+                        HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
+                        return Task.FromResult(result);
+                    }
+                    else if (request.RequestUri.AbsoluteUri.Contains(Documents.Paths.ClientConfigPathSegment))
+                    {
+                        HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
+
+                        AccountClientConfigProperties clientConfigProperties = new AccountClientConfigProperties
+                        {
+                            ClientTelemetryConfiguration = new ClientTelemetryConfiguration
+                            {
+                                IsEnabled = true,
+                                Endpoint = EndpointUrl
+                            }
+                        };
+
+                        string payload = JsonConvert.SerializeObject(clientConfigProperties);
+                        result.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+                        return Task.FromResult(result);
+                    }
+                    return null;
+                }
+            };
+
+            this.cosmosClientBuilder
+                .WithHttpClientFactory(() => new HttpClient(httpHandler))
+                .WithTelemetryDisabled();
+
+            this.SetClient(this.cosmosClientBuilder.Build());
+
+            this.database = await this.GetClient().CreateDatabaseAsync(Guid.NewGuid().ToString());
+            
+            Assert.IsNull(this.GetClient().DocumentClient.ClientTelemetryInstance);
+        }
+
+        [TestMethod]
+        public async Task Validate_ClientTelemetryJob_Status_if_Disabled_At_Environment_LevelAsync()
+        {
+            Environment.SetEnvironmentVariable("COSMOS.CLIENT_TELEMETRY_ENABLED", "false");
+
+            HttpClientHandlerHelper httpHandler = new HttpClientHandlerHelper
+            {
+                RequestCallBack = (request, cancellation) =>
+                {
+                    if (request.RequestUri.AbsoluteUri.Equals(EndpointUrl))
+                    {
+                        HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
+                        return Task.FromResult(result);
+                    }
+                    else if (request.RequestUri.AbsoluteUri.Contains(Documents.Paths.ClientConfigPathSegment))
+                    {
+                        HttpResponseMessage result = new HttpResponseMessage(HttpStatusCode.OK);
+
+                        AccountClientConfigProperties clientConfigProperties = new AccountClientConfigProperties
+                        {
+                            ClientTelemetryConfiguration = new ClientTelemetryConfiguration
+                            {
+                                IsEnabled = true,
+                                Endpoint = EndpointUrl
+                            }
+                        };
+
+                        string payload = JsonConvert.SerializeObject(clientConfigProperties);
+                        result.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+                        return Task.FromResult(result);
+                    }
+                    return null;
+                }
+            };
+
+            this.cosmosClientBuilder
+                .WithHttpClientFactory(() => new HttpClient(httpHandler));
+
+            this.SetClient(this.cosmosClientBuilder.Build());
+
+            this.database = await this.GetClient().CreateDatabaseAsync(Guid.NewGuid().ToString());
+
+            Assert.IsNull(this.GetClient().DocumentClient.ClientTelemetryInstance);
+
+            Environment.SetEnvironmentVariable("COSMOS.CLIENT_TELEMETRY_ENABLED", null);
+        }
+
+        [TestMethod]
         [DataRow(true)]
         [DataRow(false)]
         public async Task Validate_ClientTelemetryJob_Status_if_Enabled_Or_DisabledAsync(bool isEnabled)

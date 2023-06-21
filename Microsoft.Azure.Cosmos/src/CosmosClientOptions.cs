@@ -15,6 +15,7 @@ namespace Microsoft.Azure.Cosmos
     using System.Net.Security;
     using System.Security.Cryptography.X509Certificates;
     using Microsoft.Azure.Cosmos.Fluent;
+    using Microsoft.Azure.Cosmos.Telemetry;
     using Microsoft.Azure.Documents;
     using Microsoft.Azure.Documents.Client;
     using Newtonsoft.Json;
@@ -766,6 +767,7 @@ namespace Microsoft.Azure.Cosmos
             {
                 connectionPolicy.EnableClientTelemetry = this.EnableClientTelemetry.Value;
             }
+            connectionPolicy.EnableClientTelemetry = connectionPolicy.EnableClientTelemetry && CosmosClientOptions.IsClientTelemetryEnabled();
 
             if (this.ApplicationRegion != null)
             {
@@ -812,6 +814,14 @@ namespace Microsoft.Azure.Cosmos
             }
 
             return connectionPolicy;
+        }
+
+        private static bool IsClientTelemetryEnabled()
+        {
+            bool isTelemetryEnabled = ConfigurationManager
+                .GetEnvironmentVariable<bool>("COSMOS.CLIENT_TELEMETRY_ENABLED", true);
+
+            return isTelemetryEnabled;
         }
 
         internal Documents.ConsistencyLevel? GetDocumentsConsistencyLevel()
