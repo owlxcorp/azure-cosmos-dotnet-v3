@@ -1363,12 +1363,6 @@ namespace Microsoft.Azure.Cosmos
                 this.initTaskCache = null;
             }
 
-            if (this.accountClientConfigTask != null)
-            {
-                this.accountClientConfigTask.Dispose();
-                this.accountClientConfigTask = null;
-            }
-            
             if (this.ClientTelemetryInstance != null)
             {
                 this.ClientTelemetryInstance.Dispose();
@@ -6813,7 +6807,7 @@ namespace Microsoft.Azure.Cosmos
             }
             
             // No matter what, start the background job to retry calling client config API
-            this.GlobalEndpointManager.InitializeClientTelemetryTaskAndStartBackgroundRefresh();
+            this.accountClientConfigTask = this.GlobalEndpointManager.InitializeClientTelemetryTaskAndStartBackgroundRefreshAsync();
 #endif
         }
 

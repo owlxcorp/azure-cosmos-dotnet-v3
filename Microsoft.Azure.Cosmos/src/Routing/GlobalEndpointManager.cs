@@ -15,7 +15,6 @@ namespace Microsoft.Azure.Cosmos.Routing
     using System.Threading.Tasks;
     using Microsoft.Azure.Cosmos.Common;
     using Microsoft.Azure.Cosmos.Core.Trace;
-    using Microsoft.Azure.Cosmos.Resource.Settings;
     using Microsoft.Azure.Documents;
 
     /// <summary>
@@ -390,6 +389,7 @@ namespace Microsoft.Azure.Cosmos.Routing
         public void Dispose()
         {
             this.connectionPolicy.PreferenceChanged -= this.OnPreferenceChanged;
+
             if (!this.cancellationTokenSource.IsCancellationRequested)
             {
                 // This can cause task canceled exceptions if the user disposes of the object while awaiting an async call.
@@ -497,55 +497,43 @@ namespace Microsoft.Azure.Cosmos.Routing
             this.StartLocationBackgroundRefreshLoop();
         }
 
-        public virtual void InitializeClientTelemetryTaskAndStartBackgroundRefresh()
+        public virtual Task InitializeClientTelemetryTaskAndStartBackgroundRefreshAsync()
         {
-            if (this.cancellationTokenSource.IsCancellationRequested)
-            {
-                return;
-            }
-
             try
             {
-                this.RefreshAccountClientConfigsAndStartClientTelemetryJob();
+               return Task.Run(() => this.RefreshAccountClientConfigsAndStartClientTelemetryJobAsync(), this.cancellationTokenSource.Token);
             }
             catch
             {
-                this.isBackgroundAccountRefreshActive = false;
                 throw;
             }
         }
         
-#pragma warning disable VSTHRD100 // Avoid async void methods
-        public async void RefreshAccountClientConfigsAndStartClientTelemetryJob()
-#pragma warning restore VSTHRD100 // Avoid async void methods
+        public async Task RefreshAccountClientConfigsAndStartClientTelemetryJobAsync()
         {
             // Reload Account Client Configuration
-            if (this.cancellationTokenSource.IsCancellationRequested)
+            while (!this.cancellationTokenSource.IsCancellationRequested)
             {
-                return;
-            }
-            try
-            {
-                await Task.Delay(this.backgroundRefreshAccountClientConfigTimeIntervalInMS, this.cancellationTokenSource.Token);
-
-                if (this.cancellationTokenSource.IsCancellationRequested)
+                try
                 {
-                    return;
+                    await Task.Delay(this.backgroundRefreshAccountClientConfigTimeIntervalInMS, this.cancellationTokenSource.Token);
+
+                    if (this.cancellationTokenSource.IsCancellationRequested)
+                    {
+                        return;
+                    }
+                    await this.owner.RefreshDatabaseAccountClientConfigInternalAsync();
                 }
-                await this.owner.RefreshDatabaseAccountClientConfigInternalAsync();
-            }
-            catch (Exception ex)
-            {
-                if (this.cancellationTokenSource.IsCancellationRequested && (ex is OperationCanceledException || ex is ObjectDisposedException))
+                catch (Exception ex)
                 {
-                    return;
+                    if (this.cancellationTokenSource.IsCancellationRequested && (ex is OperationCanceledException || ex is ObjectDisposedException))
+                    {
+                        return;
+                    }
+
+                    DefaultTrace.TraceCritical("GlobalEndpointManager: RefreshAccountClientConfigsAndStartClientTelemetryJob() - Unable to refresh database account client config. Exception: {0}", ex.ToString());
                 }
-
-                DefaultTrace.TraceCritical("GlobalEndpointManager: RefreshAccountClientConfigsAndStartClientTelemetryJob() - Unable to refresh database account client config. Exception: {0}", ex.ToString());
             }
-
-            // Call itself to create a loop to continuously do background refresh every 10 minutes
-            this.RefreshAccountClientConfigsAndStartClientTelemetryJob();
         }
         
         private Task<AccountProperties> GetDatabaseAccountAsync(Uri serviceEndpoint)
